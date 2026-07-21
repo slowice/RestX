@@ -1,0 +1,21 @@
+appId: com.restx.desktop
+productName: RestX
+directories:
+  buildResources: build
+  output: dist
+files:
+  - out/**/*
+asar: true
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.productivity
+  entitlementsInherit: build/entitlements.mac.plist
+win:
+  target:
+    - nsis
+  artifactName: ${productName}-${version}-${arch}.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

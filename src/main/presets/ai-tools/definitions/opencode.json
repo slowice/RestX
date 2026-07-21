@@ -1,0 +1,38 @@
+{
+  "id": "opencode",
+  "displayName": "OpenCode",
+  "version": 1,
+  "probes": [
+    { "relativePath": ".config/opencode", "entryType": "directory" },
+    { "relativePath": ".local/share/opencode", "entryType": "directory" },
+    { "relativePath": ".opencode", "entryType": "directory" }
+  ],
+  "sources": [
+    {
+      "id": "opencode-config", "relativePath": ".config/opencode", "label": ".config/opencode", "maxDepth": 3,
+      "patterns": [
+        { "glob": "opencode.json*", "kind": "config", "viewer": "config", "label": "OpenCode 配置" },
+        { "glob": "tui.json*", "kind": "config", "viewer": "config", "label": "OpenCode TUI 配置" },
+        { "glob": "agents/**/*.md", "kind": "instruction", "viewer": "config", "label": "OpenCode Agent" },
+        { "glob": "commands/**/*.md", "kind": "instruction", "viewer": "config", "label": "OpenCode 命令" },
+        { "glob": "rules/**/*.md", "kind": "instruction", "viewer": "config", "label": "OpenCode 规则" }
+      ],
+      "excludes": ["auth.json", "**/*.db", "**/*.db-*", "node_modules/**", "plugins/**"]
+    },
+    {
+      "id": "opencode-user-extensions", "relativePath": ".opencode", "label": ".opencode", "maxDepth": 3,
+      "patterns": [
+        { "glob": "agents/**/*.md", "kind": "instruction", "viewer": "config", "label": "OpenCode Agent" },
+        { "glob": "commands/**/*.md", "kind": "instruction", "viewer": "config", "label": "OpenCode 命令" },
+        { "glob": "rules/**/*.md", "kind": "instruction", "viewer": "config", "label": "OpenCode 规则" },
+        { "glob": "*.json*", "kind": "config", "viewer": "config", "label": "OpenCode 配置" }
+      ],
+      "excludes": ["auth.json", "**/*.db", "**/*.db-*", "node_modules/**"]
+    },
+    {
+      "id": "opencode-logs", "relativePath": ".local/share/opencode/log", "label": "OpenCode 日志", "maxDepth": 2,
+      "patterns": [{ "glob": "**/*.log", "kind": "log", "viewer": "metadata", "label": "OpenCode 日志" }],
+      "excludes": ["**/*.db", "**/*.db-*"]
+    }
+  ]
+}

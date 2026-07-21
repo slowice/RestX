@@ -1,0 +1,59 @@
+{
+  "id": "claude-code",
+  "displayName": "Claude Code",
+  "version": 1,
+  "probes": [
+    { "relativePath": ".claude", "entryType": "directory" },
+    { "relativePath": ".claude.json", "entryType": "file" }
+  ],
+  "sources": [
+    {
+      "id": "claude-home", "relativePath": ".claude", "label": ".claude", "maxDepth": 5,
+      "patterns": [
+        { "glob": "settings*.json", "kind": "config", "viewer": "config", "label": "Claude Code 设置" },
+        { "glob": "CLAUDE.md", "kind": "instruction", "viewer": "config", "label": "Claude Code 指令" },
+        { "glob": "rules/**/*.md", "kind": "instruction", "viewer": "config", "label": "Claude Code 规则" },
+        { "glob": "agents/**/*.md", "kind": "instruction", "viewer": "config", "label": "Claude Code Agent" },
+        { "glob": "commands/**/*.md", "kind": "instruction", "viewer": "config", "label": "Claude Code 命令" },
+        { "glob": "projects/**/*.jsonl", "kind": "conversation", "viewer": "jsonl", "jsonlProfileId": "claude-code-events-v1", "label": "Claude Code 项目会话" },
+        { "glob": "history.jsonl", "kind": "history", "viewer": "jsonl", "jsonlProfileId": "claude-code-events-v1", "label": "Claude Code 活动历史" },
+        { "glob": "debug/**/*.log", "kind": "log", "viewer": "metadata", "label": "Claude Code 调试日志" },
+        { "glob": "logs/**/*.log", "kind": "log", "viewer": "metadata", "label": "Claude Code 日志" },
+        { "glob": "*.log", "kind": "log", "viewer": "metadata", "label": "Claude Code 日志" }
+      ],
+      "excludes": [".credentials.json", "telemetry/**", "file-history/**", "backups/**", "cache/**", "plugins/**", "session-env/**", "**/*.lock", "**/*.db", "**/*.db-*"]
+    },
+    {
+      "id": "claude-global-state", "relativePath": ".claude.json", "label": ".claude.json", "maxDepth": 0,
+      "patterns": [{ "glob": ".claude.json", "kind": "config", "viewer": "config", "label": "Claude Code 全局配置" }]
+    }
+  ],
+  "jsonlProfiles": [{
+    "id": "claude-code-events-v1",
+    "timestampPaths": ["timestamp", "ts"],
+    "tagRules": [
+      { "path": "type", "fallback": "raw-value", "values": {
+        "user": { "label": "用户", "tone": "user" },
+        "assistant": { "label": "助手", "tone": "assistant" },
+        "system": { "label": "系统", "tone": "system" },
+        "attachment": { "label": "附件", "tone": "neutral" },
+        "file-history-snapshot": { "label": "文件快照", "tone": "system" },
+        "queue-operation": { "label": "队列操作", "tone": "system" },
+        "mode": { "label": "模式", "tone": "system" },
+        "permission-mode": { "label": "权限模式", "tone": "system" }
+      }},
+      { "path": "subtype", "values": { "turn_duration": { "label": "性能", "tone": "neutral" } } },
+      { "path": "message.role", "values": {
+        "user": { "label": "用户", "tone": "user" },
+        "assistant": { "label": "助手", "tone": "assistant" },
+        "system": { "label": "系统", "tone": "system" }
+      }},
+      { "path": "message.content[*].type", "fallback": "raw-value", "values": {
+        "thinking": { "label": "思考", "tone": "thinking" },
+        "text": { "label": "文本", "tone": "neutral" },
+        "tool_use": { "label": "工具调用", "tone": "tool" },
+        "tool_result": { "label": "工具结果", "tone": "result" }
+      }}
+    ]
+  }]
+}

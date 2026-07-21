@@ -1,0 +1,68 @@
+{
+  "id": "codex",
+  "displayName": "Codex",
+  "version": 1,
+  "probes": [{ "relativePath": ".codex", "entryType": "directory" }],
+  "sources": [{
+    "id": "codex-home",
+    "relativePath": ".codex",
+    "label": ".codex",
+    "maxDepth": 6,
+    "patterns": [
+      { "glob": "config.toml*", "kind": "config", "viewer": "config", "label": "Codex 配置" },
+      { "glob": "AGENTS.md", "kind": "instruction", "viewer": "config", "label": "Codex 全局指令" },
+      { "glob": "rules/**/*.rules", "kind": "instruction", "viewer": "config", "label": "Codex 规则" },
+      { "glob": "prompts/**/*.md", "kind": "instruction", "viewer": "config", "label": "Codex 提示词" },
+      { "glob": "sessions/**/*.jsonl", "kind": "conversation", "viewer": "jsonl", "jsonlProfileId": "codex-events-v1", "label": "Codex 当前会话" },
+      { "glob": "archived_sessions/**/*.jsonl", "kind": "conversation", "viewer": "jsonl", "jsonlProfileId": "codex-events-v1", "label": "Codex 已归档会话" },
+      { "glob": "history.jsonl", "kind": "history", "viewer": "jsonl", "jsonlProfileId": "codex-events-v1", "label": "Codex 活动历史" },
+      { "glob": "session_index.jsonl", "kind": "history", "viewer": "jsonl", "jsonlProfileId": "codex-events-v1", "label": "Codex 会话索引" },
+      { "glob": "log/**/*.log", "kind": "log", "viewer": "metadata", "label": "Codex 日志" },
+      { "glob": "logs/**/*.log", "kind": "log", "viewer": "metadata", "label": "Codex 日志" },
+      { "glob": "*.log", "kind": "log", "viewer": "metadata", "label": "Codex 日志" }
+    ],
+    "excludes": ["auth.json", "models_cache.json", "shell_snapshots/**", "sqlite/**", "vendor_imports/**", "worktrees/**", "attachments/**", ".tmp/**", "**/*.sqlite", "**/*.sqlite-*", "**/*.db", "**/*.db-*"]
+  }],
+  "jsonlProfiles": [{
+    "id": "codex-events-v1",
+    "timestampPaths": ["timestamp", "ts"],
+    "tagRules": [
+      { "path": "type", "fallback": "raw-value", "values": {
+        "session_meta": { "label": "会话信息", "tone": "system" },
+        "turn_context": { "label": "上下文", "tone": "system" },
+        "world_state": { "label": "环境状态", "tone": "system" },
+        "compacted": { "label": "上下文压缩", "tone": "system" }
+      }},
+      { "path": "payload.type", "fallback": "raw-value", "values": {
+        "user_message": { "label": "用户", "tone": "user" },
+        "agent_message": { "label": "助手", "tone": "assistant" },
+        "agent_reasoning": { "label": "思考", "tone": "thinking" },
+        "reasoning": { "label": "思考", "tone": "thinking" },
+        "function_call": { "label": "工具调用", "tone": "tool" },
+        "custom_tool_call": { "label": "工具调用", "tone": "tool" },
+        "tool_search_call": { "label": "工具搜索", "tone": "tool" },
+        "function_call_output": { "label": "工具结果", "tone": "result" },
+        "custom_tool_call_output": { "label": "工具结果", "tone": "result" },
+        "tool_search_output": { "label": "工具结果", "tone": "result" },
+        "web_search_call": { "label": "网络搜索", "tone": "tool" },
+        "web_search_end": { "label": "搜索结果", "tone": "result" },
+        "task_started": { "label": "任务开始", "tone": "system" },
+        "task_complete": { "label": "任务完成", "tone": "system" },
+        "turn_aborted": { "label": "已中止", "tone": "error" },
+        "message": { "label": "消息", "tone": "neutral" }
+      }},
+      { "path": "payload.role", "values": {
+        "user": { "label": "用户", "tone": "user" },
+        "assistant": { "label": "助手", "tone": "assistant" },
+        "developer": { "label": "开发者指令", "tone": "system" },
+        "system": { "label": "系统", "tone": "system" }
+      }},
+      { "path": "payload.content[*].type", "values": {
+        "input_text": { "label": "输入文本", "tone": "user" },
+        "output_text": { "label": "输出文本", "tone": "assistant" },
+        "input_image": { "label": "图片", "tone": "neutral" },
+        "summary_text": { "label": "思考摘要", "tone": "thinking" }
+      }}
+    ]
+  }]
+}
