@@ -5,7 +5,7 @@ import path from 'node:path'
 export type AiCallLogEvent = {
   timestamp: string
   callId: string
-  phase: 'request' | 'response' | 'error'
+  phase: 'request' | 'response' | 'parse' | 'error'
   endpoint: string
   model: string
   durationMs?: number

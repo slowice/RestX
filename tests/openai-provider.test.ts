@@ -60,7 +60,8 @@ describe('analyzeWithOpenAiCompatible', () => {
     expect(JSON.stringify(body)).not.toContain('top-secret')
     expect(JSON.stringify(body)).not.toContain('/authorized/config.json')
     expect(JSON.stringify(body)).toContain('[REDACTED]')
-    expect(events.map((event) => event.phase)).toEqual(['request', 'response'])
+    expect(events.map((event) => event.phase)).toEqual(['request', 'response', 'parse'])
+    expect(events[2].payload).toMatchObject({ status: 'success', sections: 1, risks: 1, recommendations: 1 })
     expect(JSON.stringify(events)).not.toContain('top-secret')
     expect(JSON.stringify(events)).toContain('这是一个模型配置')
   })
@@ -77,12 +78,14 @@ describe('analyzeWithOpenAiCompatible', () => {
   })
 
   it('rejects invalid model output instead of caching it', async () => {
+    const events: AiCallLogEvent[] = []
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: '{"summary": 3}' } }] }), { status: 200 }))
     await expect(analyzeWithOpenAiCompatible({
       settings: { baseUrl: 'https://example.com/v1', model: 'demo-model', apiKey: 'key' },
-      document,
-      fetchImpl
+      document, fetchImpl, logger: { write: async (event) => { events.push(event) } }
     })).rejects.toMatchObject({ code: 'INVALID_RESPONSE' })
+    expect(events.map((event) => event.phase)).toEqual(['request', 'response', 'parse'])
+    expect(events[2]).toMatchObject({ payload: { status: 'failed' }, error: { code: 'INVALID_RESPONSE' } })
   })
 
   it('normalizes common compatible-provider field aliases before displaying the result', () => {
@@ -97,5 +100,41 @@ describe('analyzeWithOpenAiCompatible', () => {
     expect(result.sections).toEqual([{ title: '模型设置', items: [{ key: 'model', explanation: '用于选择模型', status: 'ok' }] }])
     expect(result.risks).toEqual([{ severity: 'warning', title: '注意事项', description: '建议限制配置文件权限' }])
     expect(result.recommendations).toEqual(['定期轮换密钥'])
+  })
+
+  it('recovers JSON surrounded by thinking text and normalizes common Claude-analysis variations', () => {
+    const content = `<think>我需要先分析配置</think>\n以下是结果：\n\`\`\`json\n${JSON.stringify({
+      overview: 'Claude Code 配置摘要。',
+      tool: 'Claude Code',
+      sections: {
+        '模型配置': [{ path: 'env.ANTHROPIC_MODEL', description: '主模型', status: 'normal' }]
+      },
+      warnings: [{ level: 'medium', name: '环境变量', message: '建议确认变量来源', field: 'env' }],
+      suggestions: [{ text: '定期检查模型配置' }]
+    })}\n\`\`\`\n完成。`
+
+    const result = parseAnalysisResponse(content)
+
+    expect(result).toEqual({
+      summary: 'Claude Code 配置摘要。', detectedTool: 'Claude Code',
+      sections: [{ title: '模型配置', items: [{ key: 'env.ANTHROPIC_MODEL', explanation: '主模型', status: 'ok' }] }],
+      risks: [{ severity: 'warning', title: '环境变量', description: '建议确认变量来源', path: 'env' }],
+      recommendations: ['定期检查模型配置']
+    })
+  })
+
+  it('accepts double-encoded JSON, optional collections, and array-form message content', async () => {
+    const minimal = { summary: '配置可用。' }
+    expect(parseAnalysisResponse(JSON.stringify(JSON.stringify(minimal)))).toEqual({
+      summary: '配置可用。', detectedTool: null, sections: [], risks: [], recommendations: []
+    })
+
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{ finish_reason: 'stop', message: { content: [{ type: 'text', text: JSON.stringify(validAnalysis) }] } }]
+    }), { status: 200 }))
+    const result = await analyzeWithOpenAiCompatible({
+      settings: { baseUrl: 'https://example.com/v1', model: 'demo-model', apiKey: 'key' }, document, fetchImpl
+    })
+    expect(result.summary).toBe(validAnalysis.summary)
   })
 })
