@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Bot, Check, Database, FolderCheck, KeyRound, Server, ShieldCheck, Trash2 } from 'lucide-react'
 import type { AiProviderPublicSettings, RuntimeStatus } from '../../ai-inspector/shared/contracts/ai-capability'
 import { useInspectorState } from '../../ai-inspector/renderer'
+import { CodeReviewSettingsSection } from '../../code-review/renderer'
 import { PageHeader } from '../../../platform/renderer/components/PageHeader'
 import './settings.css'
 
@@ -79,6 +80,8 @@ export function SettingsPage(): React.JSX.Element {
         <div className="settings-title"><FolderCheck size={19} /><div><h2>已授权目录</h2><p>RestX 只能访问你通过系统选择器主动授权的目录。</p></div></div>
         <div className="setting-row"><div><strong>最近使用的目录</strong><span className="path-value">{preferences?.recentDirectory ?? '暂无授权目录'}</span></div><button className="button danger" disabled={!preferences?.recentDirectory} onClick={() => void clearHistory()}><Trash2 size={15} />清除记录</button></div>
       </section>
+
+      <CodeReviewSettingsSection />
 
       <section className="settings-section provider-section">
         <div className="settings-title"><Bot size={19} /><div><h2>AI 服务</h2><p>支持 OpenAI-compatible 接口，所有请求都由 Electron 主进程发起。</p></div><span className={`runtime-badge ${runtime}`}><i />{statusLabels[runtime]}</span></div>

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { RestXApi } from '../src/app-api'
 import { aiInspectorChannels } from '../src/features/ai-inspector/shared/channels'
+import { codeReviewChannels } from '../src/features/code-review/shared/channels'
 import { createFeatureApiContributions } from '../src/platform/preload/feature-registry'
 import type { PreloadInvoke } from '../src/platform/preload/define-feature'
 import { composeApiContributions, createPlatformApi } from '../src/platform/preload/expose-api'
@@ -21,10 +22,12 @@ describe('preload API composition', () => {
     await api.app.getVersion()
     await api.app.getPreferences()
     await api.inspector.chooseDirectory()
+    await api.codeReview.getGitCodeSettings()
 
     expect(calls).toHaveBeenNthCalledWith(1, platformChannels.getVersion)
     expect(calls).toHaveBeenNthCalledWith(2, aiInspectorChannels.getPreferences)
     expect(calls).toHaveBeenNthCalledWith(3, aiInspectorChannels.chooseDirectory)
+    expect(calls).toHaveBeenNthCalledWith(4, codeReviewChannels.getGitCodeSettings)
   })
 
   it('rejects duplicate API methods', () => {

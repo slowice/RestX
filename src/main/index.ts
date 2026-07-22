@@ -2,6 +2,13 @@ import { app, BrowserWindow } from 'electron'
 import path from 'node:path'
 import { registerApplication } from '../platform/main/register-platform'
 
+const applicationName = 'RestX'
+const developmentIcon = process.env.ELECTRON_RENDERER_URL
+  ? path.join(__dirname, '../../build/icon.png')
+  : undefined
+
+app.setName(applicationName)
+
 let disposeApplication: (() => void) | null = null
 
 function createWindow(): void {
@@ -10,6 +17,8 @@ function createWindow(): void {
     height: 820,
     minWidth: 960,
     minHeight: 640,
+    title: applicationName,
+    ...(developmentIcon ? { icon: developmentIcon } : {}),
     backgroundColor: '#ffffff',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     webPreferences: {
@@ -28,6 +37,9 @@ function createWindow(): void {
 }
 
 app.whenReady().then(async () => {
+  if (process.platform === 'win32') app.setAppUserModelId('com.restx.desktop')
+  if (process.platform === 'darwin' && developmentIcon) app.dock?.setIcon(developmentIcon)
+
   disposeApplication = await registerApplication()
   createWindow()
   app.on('activate', () => {

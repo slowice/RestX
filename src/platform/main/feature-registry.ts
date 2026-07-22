@@ -1,9 +1,10 @@
 import { aiInspectorMainFeature } from '../../features/ai-inspector/main/register'
+import { codeReviewMainFeature } from '../../features/code-review/main/register'
 import { validateFeatureDefinitions, validateUniqueChannels } from '../shared/feature-validation'
 import type { MainFeature } from './define-feature'
 import type { IpcHandlerRegistry } from './ipc'
 
-const registeredFeatures = [aiInspectorMainFeature] satisfies readonly MainFeature[]
+const registeredFeatures = [aiInspectorMainFeature, codeReviewMainFeature] satisfies readonly MainFeature[]
 
 export const mainFeatures = validateFeatureDefinitions(registeredFeatures)
 

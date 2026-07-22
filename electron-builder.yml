@@ -7,12 +7,14 @@ files:
   - out/**/*
 asar: true
 mac:
+  icon: build/icon.icns
   target:
     - dmg
     - zip
   category: public.app-category.productivity
   entitlementsInherit: build/entitlements.mac.plist
 win:
+  icon: build/icon.ico
   target:
     - nsis
   artifactName: ${productName}-${version}-${arch}.${ext}
