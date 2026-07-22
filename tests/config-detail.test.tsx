@@ -3,11 +3,11 @@ import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import type { RestXApi } from '../src/shared/contracts/api'
-import type { AiProviderPublicSettings, CachedAnalysisResponse, RuntimeStatus } from '../src/shared/contracts/ai-capability'
-import type { ConfigDocument } from '../src/shared/contracts/config'
-import { AppStateProvider } from '../src/renderer/src/app/AppState'
-import { ConfigDetail } from '../src/renderer/src/features/ai-inspector/ConfigDetail'
+import type { RestXApi } from '../src/app-api'
+import type { AiProviderPublicSettings, CachedAnalysisResponse, RuntimeStatus } from '../src/features/ai-inspector/shared/contracts/ai-capability'
+import type { ConfigDocument } from '../src/features/ai-inspector/shared/contracts/config'
+import { InspectorStateProvider } from '../src/features/ai-inspector/renderer/state/InspectorState'
+import { ConfigDetail } from '../src/features/ai-inspector/renderer/components/ConfigDetail'
 
 const document: ConfigDocument = {
   path: '/authorized/config.json', name: 'config.json', format: 'json', sizeBytes: 40,
@@ -44,7 +44,7 @@ function renderDetail(consent = false): void {
 
 function renderDetailWithApi(api: RestXApi): void {
   Object.defineProperty(window, 'restx', { configurable: true, value: api })
-  render(<MemoryRouter><AppStateProvider><ConfigDetail document={document} onClose={vi.fn()} /></AppStateProvider></MemoryRouter>)
+  render(<MemoryRouter><InspectorStateProvider><ConfigDetail document={document} onClose={vi.fn()} /></InspectorStateProvider></MemoryRouter>)
 }
 
 beforeEach(() => localStorage.clear())

@@ -1,0 +1,10 @@
+.lab-card { display: flex; min-height: 470px; align-items: center; flex-direction: column; padding: 72px 20px; text-align: center; border: 1px solid #232d3e; border-radius: 17px; background: radial-gradient(circle at 50% 25%, rgba(107, 82, 223, .12), transparent 28%), #101620; }
+.lab-art { position: relative; display: grid; place-items: center; width: 100px; height: 100px; margin-bottom: 24px; color: #9b8cff; border: 1px solid rgba(139, 119, 242, .25); border-radius: 28px; background: rgba(117, 94, 225, .1); transform: rotate(-4deg); }.lab-art svg:last-child { position: absolute; right: 5px; top: 2px; color: #68ddbd; }
+.lab-card p { max-width: 540px; margin: 0; color: #8490a3; font-size: 12px; line-height: 1.75; }.locked-feature { display: flex; width: 360px; align-items: center; gap: 12px; margin-top: 28px; padding: 14px; color: #6f7b8e; border: 1px dashed #2a3445; border-radius: 11px; text-align: left; }.locked-feature span { display: flex; flex-direction: column; gap: 3px; }.locked-feature strong { color: #aeb7c5; font-size: 11px; }.locked-feature small { font-size: 9px; }
+.lab-card { border-color: #e3e3e3; background: radial-gradient(circle at 50% 25%, rgba(16, 163, 127, .07), transparent 28%), #fff; }
+.lab-art { color: #10a37f; border-color: #bfe8dc; background: #e8f7f2; }
+.lab-art svg:last-child { color: #10a37f; }
+.lab-card p { color: #666; }
+.locked-feature { color: #777; border-color: #d5d5d5; background: #fafafa; }
+.locked-feature strong { color: #333; }
+.lab-card h2 { margin: 17px 0 8px; color: #171717; font: 700 20px 'Manrope'; }

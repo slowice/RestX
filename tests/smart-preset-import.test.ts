@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import type { AiCallLogEvent } from '../src/main/services/ai-call-logger'
-import { generateSmartPresetDraft, SMART_PRESET_SYSTEM_PROMPT } from '../src/main/services/smart-preset-import'
+import type { AiCallLogEvent } from '../src/features/ai-inspector/main/services/ai-call-logger'
+import { generateSmartPresetDraft, SMART_PRESET_SYSTEM_PROMPT } from '../src/features/ai-inspector/main/services/smart-preset-import'
 
 const temporaryDirectories: string[] = []
 afterEach(async () => Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true }))))

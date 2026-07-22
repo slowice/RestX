@@ -15,5 +15,16 @@
       "@shared/*": ["src/shared/*"]
     }
   },
-  "include": ["src/renderer/**/*.ts", "src/renderer/**/*.tsx", "src/shared/**/*.ts", "tests/**/*.tsx"]
+  "include": [
+    "src/app-api.ts",
+    "src/renderer/**/*.ts",
+    "src/renderer/**/*.tsx",
+    "src/platform/shared/**/*.ts",
+    "src/platform/renderer/**/*.ts",
+    "src/platform/renderer/**/*.tsx",
+    "src/features/*/shared/**/*.ts",
+    "src/features/*/renderer/**/*.ts",
+    "src/features/*/renderer/**/*.tsx",
+    "tests/**/*.tsx"
+  ]
 }

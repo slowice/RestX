@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import type { AiToolPreset } from '../src/shared/contracts/ai-tool-preset'
-import { UserPresetStore } from '../src/main/services/user-preset-store'
+import type { AiToolPreset } from '../src/features/ai-inspector/shared/contracts/ai-tool-preset'
+import { UserPresetStore } from '../src/features/ai-inspector/main/services/user-preset-store'
 
 const temporaryDirectories: string[] = []
 

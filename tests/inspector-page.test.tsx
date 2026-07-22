@@ -3,14 +3,14 @@ import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import type { RestXApi } from '../src/shared/contracts/api'
-import type { AiProviderPublicSettings, CachedAnalysisResponse, RuntimeStatus } from '../src/shared/contracts/ai-capability'
-import type { ConfigDocument } from '../src/shared/contracts/config'
-import type { ScanCandidate, ScanResult } from '../src/shared/contracts/inspector'
-import type { JsonlEntryDetail, JsonlPage } from '../src/shared/contracts/jsonl'
-import type { SmartPresetDraft, UserPresetSummary } from '../src/shared/contracts/smart-import'
-import { AppStateProvider } from '../src/renderer/src/app/AppState'
-import { InspectorPage } from '../src/renderer/src/features/ai-inspector/InspectorPage'
+import type { RestXApi } from '../src/app-api'
+import type { AiProviderPublicSettings, CachedAnalysisResponse, RuntimeStatus } from '../src/features/ai-inspector/shared/contracts/ai-capability'
+import type { ConfigDocument } from '../src/features/ai-inspector/shared/contracts/config'
+import type { ScanCandidate, ScanResult } from '../src/features/ai-inspector/shared/contracts/inspector'
+import type { JsonlEntryDetail, JsonlPage } from '../src/features/ai-inspector/shared/contracts/jsonl'
+import type { SmartPresetDraft, UserPresetSummary } from '../src/features/ai-inspector/shared/contracts/smart-import'
+import { InspectorStateProvider } from '../src/features/ai-inspector/renderer/state/InspectorState'
+import { InspectorPage } from '../src/features/ai-inspector/renderer/pages/InspectorPage'
 
 const configCandidate: ScanCandidate = {
   path: '/Users/demo/.codex/config.toml',
@@ -91,7 +91,7 @@ describe('Inspector tool folder browser', () => {
   it('shows detected tools, opens a category folder, and reuses config detail', async () => {
     const api = makeApi()
     Object.defineProperty(window, 'restx', { configurable: true, value: api })
-    render(<MemoryRouter><AppStateProvider><InspectorPage /></AppStateProvider></MemoryRouter>)
+    render(<MemoryRouter><InspectorStateProvider><InspectorPage /></InspectorStateProvider></MemoryRouter>)
 
     fireEvent.click(screen.getAllByRole('button', { name: /选择用户目录/ })[0])
 
@@ -134,7 +134,7 @@ describe('Inspector tool folder browser', () => {
       tags: [{ label: '思考', tone: 'thinking' }], parseError: null, truncated: false
     }))
     Object.defineProperty(window, 'restx', { configurable: true, value: api })
-    render(<MemoryRouter><AppStateProvider><InspectorPage /></AppStateProvider></MemoryRouter>)
+    render(<MemoryRouter><InspectorStateProvider><InspectorPage /></InspectorStateProvider></MemoryRouter>)
 
     fireEvent.click(screen.getAllByRole('button', { name: /选择用户目录/ })[0])
     await waitFor(() => expect(screen.getByRole('button', { name: /会话记录.*对话、思考与工具调用记录/ })).toBeInTheDocument())
@@ -168,7 +168,7 @@ describe('Inspector tool folder browser', () => {
     api.presets.generateDraft = vi.fn(async () => draft)
     api.presets.save = vi.fn(async (): Promise<UserPresetSummary> => ({ id: 'nova', displayName: 'Nova', enabled: true, valid: true, format: 'json', filePath: '/Users/demo/.RestX/presets/nova.json', error: null }))
     Object.defineProperty(window, 'restx', { configurable: true, value: api })
-    render(<MemoryRouter><AppStateProvider><InspectorPage /></AppStateProvider></MemoryRouter>)
+    render(<MemoryRouter><InspectorStateProvider><InspectorPage /></InspectorStateProvider></MemoryRouter>)
 
     fireEvent.click(screen.getAllByRole('button', { name: /选择用户目录/ })[0])
     await waitFor(() => expect(screen.getByText('1 / 3 已检测到')).toBeInTheDocument())
