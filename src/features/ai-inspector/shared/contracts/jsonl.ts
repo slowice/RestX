@@ -11,6 +11,7 @@ export type JsonlPageRequest = {
   cursor?: string
   snapshotId?: string
   limit?: number
+  query?: string
 }
 
 export type JsonlEntryRequest = {
@@ -26,6 +27,9 @@ export type JsonlEventSummary = {
   byteLength: number
   rawPreview: string
   timestamp: string | null
+  sessionId: string | null
+  workspace: string | null
+  contentPreview: string | null
   tags: JsonlTag[]
   parseStatus: 'valid' | 'invalid' | 'oversized'
 }
@@ -41,6 +45,12 @@ export type JsonlPage = {
   entries: JsonlEventSummary[]
   olderCursor: string | null
   changed: boolean
+  search: {
+    query: string
+    scannedEntries: number
+    scannedBytes: number
+    truncated: boolean
+  } | null
 }
 
 export type JsonlEntryDetail = {
@@ -49,5 +59,33 @@ export type JsonlEntryDetail = {
   formatted: string | null
   tags: JsonlTag[]
   parseError: string | null
+  truncated: boolean
+}
+
+export type JsonlWorkspaceSearchRequest = {
+  query: string
+  files: Array<{
+    path: string
+    profileId: string
+  }>
+}
+
+export type JsonlWorkspaceSearchHit = {
+  file: {
+    path: string
+    name: string
+    modifiedAt: string
+    snapshotId: string
+  }
+  entry: JsonlEventSummary
+}
+
+export type JsonlWorkspaceSearchResult = {
+  query: string
+  hits: JsonlWorkspaceSearchHit[]
+  scannedFiles: number
+  totalFiles: number
+  scannedEntries: number
+  scannedBytes: number
   truncated: boolean
 }

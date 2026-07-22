@@ -14,6 +14,7 @@ export const aiInspectorPreloadFeature = definePreloadFeature({
         readConfig: (filePath) => invoke(channels.readConfig, filePath),
         readJsonlPage: (input) => invoke(channels.readJsonlPage, input),
         readJsonlEntry: (input) => invoke(channels.readJsonlEntry, input),
+        searchJsonlWorkspace: (input) => invoke(channels.searchJsonlWorkspace, input),
         revealInFolder: (filePath) => invoke(channels.revealInFolder, filePath)
       },
       app: {

@@ -1,7 +1,7 @@
 import { dialog, shell } from 'electron'
 import path from 'node:path'
 import type { AnalyzeConfigInput, AiProviderSettingsInput } from '../shared/contracts/ai-capability'
-import type { JsonlEntryRequest, JsonlPageRequest } from '../shared/contracts/jsonl'
+import type { JsonlEntryRequest, JsonlPageRequest, JsonlWorkspaceSearchRequest } from '../shared/contracts/jsonl'
 import type { SaveUserPresetInput, SmartPresetDraftRequest } from '../shared/contracts/smart-import'
 import { aiInspectorChannels } from '../shared/channels'
 import { defineMainFeature } from '../../../platform/main/define-feature'
@@ -15,7 +15,7 @@ import { analyzeWithOpenAiCompatible } from './services/openai-provider'
 import { preferences } from './services/preferences'
 import { providerSettings } from './services/provider-settings'
 import { scanDirectory } from './services/file-scanner'
-import { readJsonlEntry, readJsonlPage } from './services/jsonl-browser'
+import { readJsonlEntry, readJsonlPage, searchJsonlWorkspace } from './services/jsonl-browser'
 import { generateSmartPresetDraft } from './services/smart-preset-import'
 import { refreshAiToolPresetRegistry, userPresetStore } from './services/user-preset-store'
 
@@ -42,6 +42,8 @@ function assertJsonlPageRequest(value: unknown): asserts value is JsonlPageReque
   if (input.cursor !== undefined && (typeof input.cursor !== 'string' || !/^\d+$/.test(input.cursor))) throw new Error('cursor 参数无效。')
   if (input.snapshotId !== undefined && typeof input.snapshotId !== 'string') throw new Error('snapshotId 参数无效。')
   if (input.limit !== undefined && (!Number.isInteger(input.limit) || (input.limit as number) < 1 || (input.limit as number) > 200)) throw new Error('limit 参数无效。')
+  if (input.query !== undefined && (typeof input.query !== 'string' || !input.query.trim() || input.query.trim().length > 200 || /[\u0000-\u001F\u007F]/.test(input.query))) throw new Error('query 参数无效。')
+  if (input.query !== undefined && input.cursor !== undefined) throw new Error('搜索请求不能包含 cursor。')
 }
 
 function assertJsonlEntryRequest(value: unknown): asserts value is JsonlEntryRequest {
@@ -52,6 +54,19 @@ function assertJsonlEntryRequest(value: unknown): asserts value is JsonlEntryReq
   assertString(input.offset, 'offset')
   assertString(input.snapshotId, 'snapshotId')
   if (!/^\d+$/.test(input.offset as string) || !Number.isInteger(input.byteLength) || (input.byteLength as number) < 0) throw new Error('记录位置参数无效。')
+}
+
+function assertJsonlWorkspaceSearchRequest(value: unknown): asserts value is JsonlWorkspaceSearchRequest {
+  if (!value || typeof value !== 'object') throw new Error('Workspace 会话搜索请求无效。')
+  const input = value as Record<string, unknown>
+  if (typeof input.query !== 'string' || !input.query.trim() || input.query.trim().length > 200 || /[\u0000-\u001F\u007F]/.test(input.query)) throw new Error('query 参数无效。')
+  if (!Array.isArray(input.files) || input.files.length < 1 || input.files.length > 500) throw new Error('会话文件列表无效。')
+  for (const file of input.files) {
+    if (!file || typeof file !== 'object') throw new Error('会话文件参数无效。')
+    const record = file as Record<string, unknown>
+    assertString(record.path, 'path')
+    assertString(record.profileId, 'profileId')
+  }
 }
 
 function assertSmartPresetRequest(value: unknown): asserts value is SmartPresetDraftRequest {
@@ -117,6 +132,12 @@ export const aiInspectorMainFeature = defineMainFeature({
     assertJsonlEntryRequest(input)
     await authorizedPaths.assertAuthorized(input.path)
     return readJsonlEntry(input)
+  })
+
+  ipc.handle(aiInspectorChannels.searchJsonlWorkspace, async (_event, input: unknown) => {
+    assertJsonlWorkspaceSearchRequest(input)
+    for (const filePath of new Set(input.files.map((file) => file.path))) await authorizedPaths.assertAuthorized(filePath)
+    return searchJsonlWorkspace(input)
   })
 
   ipc.handle(aiInspectorChannels.revealInFolder, async (_event, filePath: unknown) => {

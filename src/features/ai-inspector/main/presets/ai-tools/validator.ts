@@ -54,12 +54,17 @@ export function validateAiToolPresets(presets: readonly AiToolPreset[]): void {
     if (!Array.isArray(profiles) || profiles.length > 8) throw new Error(`JSONL profile 列表无效：${preset.id}`)
     for (const profile of profiles) {
       if (!isRecord(profile)) throw new Error(`JSONL profile 格式无效：${preset.id}`)
-      assertKeys(profile, ['id', 'timestampPaths', 'tagRules'], 'JSONL profile')
+      assertKeys(profile, ['id', 'timestampPaths', 'sessionPaths', 'workspacePaths', 'summaryPaths', 'tagRules'], 'JSONL profile')
       assertShortString(profile.id, 'JSONL profile id', 100)
       if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(profile.id) || profileIds.has(profile.id)) throw new Error(`JSONL profile id 无效或重复：${profile.id}`)
       profileIds.add(profile.id)
       localProfileIds.add(profile.id)
       if (!Array.isArray(profile.timestampPaths) || profile.timestampPaths.length > 12) throw new Error(`JSONL 时间路径无效：${profile.id}`)
+      for (const [label, paths] of [
+        ['会话', profile.sessionPaths], ['工作区', profile.workspacePaths], ['摘要', profile.summaryPaths]
+      ] as const) {
+        if (paths !== undefined && (!Array.isArray(paths) || paths.length > 20)) throw new Error(`JSONL ${label}路径无效：${profile.id}`)
+      }
       if (!Array.isArray(profile.tagRules) || profile.tagRules.length === 0 || profile.tagRules.length > 30) throw new Error(`JSONL profile 没有有效标签规则：${profile.id}`)
       for (const rule of profile.tagRules) {
         if (!isRecord(rule)) throw new Error(`JSONL 标签规则无效：${profile.id}`)
@@ -76,7 +81,13 @@ export function validateAiToolPresets(presets: readonly AiToolPreset[]): void {
           }
         }
       }
-      for (const valuePath of [...profile.timestampPaths, ...profile.tagRules.map((rule) => rule.path)]) {
+      for (const valuePath of [
+        ...profile.timestampPaths,
+        ...(Array.isArray(profile.sessionPaths) ? profile.sessionPaths : []),
+        ...(Array.isArray(profile.workspacePaths) ? profile.workspacePaths : []),
+        ...(Array.isArray(profile.summaryPaths) ? profile.summaryPaths : []),
+        ...profile.tagRules.map((rule) => rule.path)
+      ]) {
         if (typeof valuePath !== 'string' || !/^[A-Za-z0-9_-]+(?:\[\*\])?(?:\.[A-Za-z0-9_-]+(?:\[\*\])?)*$/.test(valuePath)) {
           throw new Error(`JSONL profile 路径无效：${profile.id}/${String(valuePath)}`)
         }

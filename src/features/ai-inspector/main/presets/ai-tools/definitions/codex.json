@@ -26,6 +26,9 @@
   "jsonlProfiles": [{
     "id": "codex-events-v1",
     "timestampPaths": ["timestamp", "ts"],
+    "sessionPaths": ["session_id", "sessionId", "payload.id", "payload.session_id", "payload.sessionId"],
+    "workspacePaths": ["cwd", "project", "project_path", "payload.cwd", "payload.project"],
+    "summaryPaths": ["text", "display", "payload.message", "payload.text", "payload.content[*].text", "message.content", "message.content[*].text"],
     "tagRules": [
       { "path": "type", "fallback": "raw-value", "values": {
         "session_meta": { "label": "会话信息", "tone": "system" },

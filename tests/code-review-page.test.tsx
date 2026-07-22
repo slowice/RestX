@@ -22,7 +22,7 @@ const result: CodeReviewResult = {
 
 function makeApi(): RestXApi {
   return {
-    inspector: { chooseDirectory: vi.fn(), scanDirectory: vi.fn(), readConfig: vi.fn(), readJsonlPage: vi.fn(), readJsonlEntry: vi.fn(), revealInFolder: vi.fn() },
+    inspector: { chooseDirectory: vi.fn(), scanDirectory: vi.fn(), readConfig: vi.fn(), readJsonlPage: vi.fn(), readJsonlEntry: vi.fn(), searchJsonlWorkspace: vi.fn(), revealInFolder: vi.fn() },
     app: { getVersion: vi.fn(), getPreferences: vi.fn(), setAiLocalAnalysisEnabled: vi.fn(), clearHistory: vi.fn() },
     ai: { getRuntimeStatus: vi.fn(), getProviderSettings: vi.fn(), updateProviderSettings: vi.fn(), analyzeConfig: vi.fn(), getCachedAnalysis: vi.fn(), clearAnalysisCache: vi.fn() },
     presets: { list: vi.fn(), generateDraft: vi.fn(), save: vi.fn(), setEnabled: vi.fn(), delete: vi.fn() },

@@ -1,7 +1,7 @@
 import type { AiAnalysisResponse, AiProviderPublicSettings, AiProviderSettingsInput, AnalyzeConfigInput, CachedAnalysisResponse, RuntimeStatus } from './contracts/ai-capability'
 import type { ConfigDocument } from './contracts/config'
 import type { ScanResult } from './contracts/inspector'
-import type { JsonlEntryDetail, JsonlEntryRequest, JsonlPage, JsonlPageRequest } from './contracts/jsonl'
+import type { JsonlEntryDetail, JsonlEntryRequest, JsonlPage, JsonlPageRequest, JsonlWorkspaceSearchRequest, JsonlWorkspaceSearchResult } from './contracts/jsonl'
 import type { SaveUserPresetInput, SmartPresetDraft, SmartPresetDraftRequest, UserPresetSummary } from './contracts/smart-import'
 
 export type AppPreferences = {
@@ -16,6 +16,7 @@ export type AiInspectorApi = {
     readConfig(path: string): Promise<ConfigDocument>
     readJsonlPage(input: JsonlPageRequest): Promise<JsonlPage>
     readJsonlEntry(input: JsonlEntryRequest): Promise<JsonlEntryDetail>
+    searchJsonlWorkspace(input: JsonlWorkspaceSearchRequest): Promise<JsonlWorkspaceSearchResult>
     revealInFolder(path: string): Promise<void>
   }
   app: {

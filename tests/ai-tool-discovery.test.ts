@@ -28,7 +28,10 @@ describe('AI tool discovery framework', () => {
     await writeFile(path.join(root, '.codex', 'AGENTS.md'), 'Be helpful')
     await writeFile(path.join(root, '.codex', 'logs', 'latest.log'), 'started')
     await writeFile(path.join(root, '.codex', 'auth.json'), '{"token":"secret"}')
-    await writeFile(path.join(root, '.codex', 'sessions', 'session.jsonl'), '{}')
+    await writeFile(path.join(root, '.codex', 'sessions', 'session.jsonl'), [
+      JSON.stringify({ timestamp: '2026-07-22T08:00:00Z', type: 'session_meta', payload: { id: 'session-42', cwd: '/Users/demo/RestX' } }),
+      JSON.stringify({ timestamp: '2026-07-22T08:01:00Z', type: 'event_msg', payload: { type: 'user_message', message: '为什么模型调用超时？' } })
+    ].join('\n'))
 
     const result = await discoverAiTools(root, limits)
     const codex = result.tools.find((tool) => tool.id === 'codex')
@@ -40,6 +43,13 @@ describe('AI tool discovery framework', () => {
     expect(result.candidates.map((candidate) => candidate.name)).toEqual(['config.toml', 'AGENTS.md', 'session.jsonl', 'latest.log'])
     expect(result.candidates.every((candidate) => candidate.toolId === 'codex')).toBe(true)
     expect(result.candidates.some((candidate) => candidate.name === 'auth.json')).toBe(false)
+    expect(result.candidates.find((candidate) => candidate.name === 'session.jsonl')?.session).toEqual({
+      sessionId: 'session-42', workspace: '/Users/demo/RestX', title: '为什么模型调用超时？', startedAt: '2026-07-22T08:00:00.000Z'
+    })
+    const conversationFolder = codex?.folders.find((folder) => folder.kind === 'conversation')
+    expect(conversationFolder?.children).toHaveLength(1)
+    expect(conversationFolder?.children[0]).toMatchObject({ name: 'RestX', path: '/Users/demo/RestX', role: 'physical' })
+    expect(conversationFolder?.children[0].files[0].name).toBe('session.jsonl')
   })
 
   it('accepts a synthetic fourth tool without changing discovery code', async () => {
@@ -68,6 +78,7 @@ describe('AI tool discovery framework', () => {
     expect(result.tools[0]).toMatchObject({ id: 'nova', displayName: 'Nova', status: 'detected' })
     expect(result.candidates[0]).toMatchObject({ name: 'nova.yaml', toolId: 'nova', kind: 'config' })
     expect(result.candidates[1]).toMatchObject({ name: 'session.jsonl', toolId: 'nova', kind: 'conversation', viewer: 'jsonl', jsonlProfileId: 'nova-events-v1' })
+    expect(result.tools[0].folders.find((folder) => folder.kind === 'conversation')?.children[0]).toMatchObject({ name: '未知工作区', path: null })
   })
 
   it('rejects unsafe preset paths before scanning', () => {

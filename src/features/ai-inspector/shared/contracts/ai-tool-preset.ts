@@ -23,6 +23,9 @@ export type JsonlTagRule = {
 export type JsonlProfile = {
   id: string
   timestampPaths: string[]
+  sessionPaths?: string[]
+  workspacePaths?: string[]
+  summaryPaths?: string[]
   tagRules: JsonlTagRule[]
 }
 

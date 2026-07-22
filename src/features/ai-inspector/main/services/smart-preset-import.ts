@@ -21,7 +21,7 @@ export const SMART_PRESET_SYSTEM_PROMPT = `你是 RestX AI 工具预置生成器
 你的唯一任务是根据目录元数据为 RestX 生成一个严格的声明式预置。只返回 JSON，不要 Markdown、注释或额外文本。
 
 返回结构：
-{"preset":{"id":"kebab-case","displayName":"工具名","version":1,"probes":[{"relativePath":"相对路径","entryType":"file|directory"}],"sources":[{"id":"kebab-case","relativePath":"相对路径","label":"人类可读名称","maxDepth":0,"patterns":[{"glob":"glob","kind":"config|instruction|conversation|history|log","viewer":"config|jsonl|metadata","label":"匹配说明","jsonlProfileId":"仅 jsonl 时需要"}],"excludes":["glob"]}],"jsonlProfiles":[{"id":"kebab-case-v1","timestampPaths":["timestamp"],"tagRules":[{"path":"type","fallback":"raw-value|ignore","values":{"value":{"label":"标签","tone":"neutral|user|assistant|thinking|tool|result|system|error"}}}]}]},"explanation":"简短说明判断依据","warnings":["不确定性"]}
+{"preset":{"id":"kebab-case","displayName":"工具名","version":1,"probes":[{"relativePath":"相对路径","entryType":"file|directory"}],"sources":[{"id":"kebab-case","relativePath":"相对路径","label":"人类可读名称","maxDepth":0,"patterns":[{"glob":"glob","kind":"config|instruction|conversation|history|log","viewer":"config|jsonl|metadata","label":"匹配说明","jsonlProfileId":"仅 jsonl 时需要"}],"excludes":["glob"]}],"jsonlProfiles":[{"id":"kebab-case-v1","timestampPaths":["timestamp"],"sessionPaths":["sessionId"],"workspacePaths":["cwd"],"summaryPaths":["message.content","text"],"tagRules":[{"path":"type","fallback":"raw-value|ignore","values":{"value":{"label":"标签","tone":"neutral|user|assistant|thinking|tool|result|system|error"}}}]}]},"explanation":"简短说明判断依据","warnings":["不确定性"]}
 
 必须遵守：
 1. 路径始终相对于扫描根目录，不允许绝对路径、~、.. 或反斜杠越界。
@@ -29,8 +29,9 @@ export const SMART_PRESET_SYSTEM_PROMPT = `你是 RestX AI 工具预置生成器
 3. 禁止 **/* 这类全量规则。只匹配明确的配置、指令、会话、历史和日志文件。
 4. 始终排除 auth、credentials、secrets、token、keychain、数据库、cache、node_modules、plugins 和二进制文件。
 5. config/instruction 使用 viewer=config；JSONL 会话/历史使用 viewer=jsonl 并引用同一 preset 内的 profile；普通日志使用 viewer=metadata。
-6. JSONL 标签只能使用简单字段路径，可使用 content[*].type。不知道内部结构时使用保守的 type/role 规则和 fallback。
-7. 不得返回代码、脚本、正则表达式、回调、命令或模型工具调用。`
+6. 对 JSONL 尽量声明 sessionPaths、workspacePaths、summaryPaths 的候选字段，让历史记录可按会话/工作区分组并显示用户问题；无法确认时可省略，不要猜测不存在的路径。
+7. JSONL 标签只能使用简单字段路径，可使用 content[*].type。不知道内部结构时使用保守的 type/role 规则和 fallback。
+8. 不得返回代码、脚本、正则表达式、回调、命令或模型工具调用。`
 
 type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
 

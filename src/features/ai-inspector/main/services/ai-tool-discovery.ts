@@ -10,6 +10,7 @@ import type {
 } from '../../shared/contracts/inspector'
 import { AI_TOOL_PRESETS, type AiToolMatchRule, type AiToolPreset, type AiToolSource } from '../presets/ai-tools'
 import { validateAiToolPresets } from '../presets/ai-tools/validator'
+import { readJsonlSessionSummary } from './jsonl-browser'
 
 export { validateAiToolPresets } from '../presets/ai-tools/validator'
 
@@ -121,17 +122,71 @@ function buildFolders(candidates: ScanCandidate[]): { counts: ToolCandidateCount
   for (const candidate of candidates) counts[candidate.kind] += 1
   const folders = (Object.keys(KIND_NAMES) as CandidateKind[])
     .filter((kind) => counts[kind] > 0)
-    .map((kind): ToolFolderNode => ({
-      id: kind,
-      name: KIND_NAMES[kind],
-      path: null,
-      role: 'category',
-      kind,
-      counts: { ...emptyCounts(), [kind]: counts[kind] },
-      children: [],
-      files: candidates.filter((candidate) => candidate.kind === kind)
-    }))
+    .map((kind): ToolFolderNode => {
+      const files = candidates.filter((candidate) => candidate.kind === kind)
+      return {
+        id: kind,
+        name: KIND_NAMES[kind],
+        path: null,
+        role: 'category',
+        kind,
+        counts: { ...emptyCounts(), [kind]: counts[kind] },
+        children: kind === 'conversation' ? buildWorkspaceFolders(files) : [],
+        files
+      }
+    })
   return { counts, folders }
+}
+
+function buildWorkspaceFolders(files: ScanCandidate[]): ToolFolderNode[] {
+  const grouped = new Map<string, ScanCandidate[]>()
+  for (const file of files) {
+    const workspace = file.session?.workspace?.trim() || '__unknown_workspace__'
+    const current = grouped.get(workspace) ?? []
+    current.push(file)
+    grouped.set(workspace, current)
+  }
+  return [...grouped].map(([workspace, sessions], index): ToolFolderNode => {
+    const unknown = workspace === '__unknown_workspace__'
+    sessions.sort((left, right) => Date.parse(right.modifiedAt) - Date.parse(left.modifiedAt))
+    return {
+      id: `conversation-workspace-${index}`,
+      name: unknown ? '未知工作区' : workspaceName(workspace),
+      path: unknown ? null : workspace,
+      role: 'physical',
+      kind: 'conversation',
+      counts: { ...emptyCounts(), conversation: sessions.length },
+      children: [],
+      files: sessions
+    }
+  }).sort((left, right) => {
+    const leftTime = Date.parse(left.files[0]?.modifiedAt ?? '') || 0
+    const rightTime = Date.parse(right.files[0]?.modifiedAt ?? '') || 0
+    return rightTime - leftTime || left.name.localeCompare(right.name, undefined, { sensitivity: 'base', numeric: true })
+  })
+}
+
+function workspaceName(workspace: string): string {
+  const normalized = workspace.replace(/[\\/]+$/, '')
+  return normalized.split(/[\\/]/).pop() || workspace
+}
+
+async function enrichConversationSessions(candidates: ScanCandidate[], skipped: SkippedEntry[]): Promise<void> {
+  const sessions = candidates.filter((candidate) => candidate.kind === 'conversation' && candidate.viewer === 'jsonl' && candidate.jsonlProfileId)
+  let nextIndex = 0
+  const workerCount = Math.min(8, sessions.length)
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (nextIndex < sessions.length) {
+      const candidate = sessions[nextIndex]
+      nextIndex += 1
+      try {
+        candidate.session = await readJsonlSessionSummary({ path: candidate.path, profileId: candidate.jsonlProfileId! })
+      } catch {
+        candidate.session = { sessionId: null, workspace: null, title: null, startedAt: null }
+        pushSkipped(skipped, { path: candidate.path, reason: '无法读取会话摘要，已归入未知工作区' })
+      }
+    }
+  }))
 }
 
 export async function discoverAiTools(
@@ -230,6 +285,8 @@ export async function discoverAiTools(
       }
     }
   }
+
+  await enrichConversationSessions(candidates, skipped)
 
   const presetOrder = new Map(presets.map((preset, index) => [preset.id, index]))
   const kindOrder: Record<CandidateKind, number> = { config: 0, instruction: 1, conversation: 2, history: 3, log: 4 }

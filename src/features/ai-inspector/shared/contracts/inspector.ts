@@ -1,6 +1,13 @@
 export type CandidateKind = 'config' | 'instruction' | 'conversation' | 'history' | 'log'
 export type CandidateViewer = 'config' | 'jsonl' | 'metadata'
 
+export type ConversationSessionSummary = {
+  sessionId: string | null
+  workspace: string | null
+  title: string | null
+  startedAt: string | null
+}
+
 export type ScanCandidate = {
   path: string
   name: string
@@ -13,6 +20,7 @@ export type ScanCandidate = {
   toolId?: string
   sourceId?: string
   relativePath?: string
+  session?: ConversationSessionSummary
 }
 
 export type ToolDetectionEvidence = {

@@ -7,7 +7,7 @@ import type { RestXApi } from '../src/app-api'
 import type { AiProviderPublicSettings, CachedAnalysisResponse, RuntimeStatus } from '../src/features/ai-inspector/shared/contracts/ai-capability'
 import type { ConfigDocument } from '../src/features/ai-inspector/shared/contracts/config'
 import type { ScanCandidate, ScanResult } from '../src/features/ai-inspector/shared/contracts/inspector'
-import type { JsonlEntryDetail, JsonlPage } from '../src/features/ai-inspector/shared/contracts/jsonl'
+import type { JsonlEntryDetail, JsonlPage, JsonlPageRequest, JsonlWorkspaceSearchResult } from '../src/features/ai-inspector/shared/contracts/jsonl'
 import type { SmartPresetDraft, UserPresetSummary } from '../src/features/ai-inspector/shared/contracts/smart-import'
 import { InspectorStateProvider } from '../src/features/ai-inspector/renderer/state/InspectorState'
 import { InspectorPage } from '../src/features/ai-inspector/renderer/pages/InspectorPage'
@@ -68,6 +68,7 @@ function makeApi(): RestXApi {
       readConfig: vi.fn(async () => document),
       readJsonlPage: vi.fn(),
       readJsonlEntry: vi.fn(),
+      searchJsonlWorkspace: vi.fn(),
       revealInFolder: vi.fn(async () => undefined)
     },
     app: {
@@ -106,11 +107,12 @@ describe('Inspector tool folder browser', () => {
     expect(api.inspector.readConfig).toHaveBeenCalledWith(configCandidate.path)
   })
 
-  it('opens JSONL conversations as tagged rows and formats a selected event', async () => {
+  it('browses conversations by workspace and searches across its sessions before opening one', async () => {
     const jsonlCandidate: ScanCandidate = {
       path: '/Users/demo/.codex/sessions/demo.jsonl', name: 'demo.jsonl', kind: 'conversation', viewer: 'jsonl',
       jsonlProfileId: 'codex-events-v1', matchedBy: 'Codex 预置 · Codex 当前会话', sizeBytes: 120,
-      modifiedAt: '2026-07-21T09:00:00.000Z', toolId: 'codex', sourceId: 'codex-home', relativePath: '.codex/sessions/demo.jsonl'
+      modifiedAt: '2026-07-21T09:00:00.000Z', toolId: 'codex', sourceId: 'codex-home', relativePath: '.codex/sessions/demo.jsonl',
+      session: { sessionId: 'session-demo', workspace: '/Users/demo/work', title: '排查模型调用错误', startedAt: '2026-07-21T09:00:00.000Z' }
     }
     const jsonlResult: ScanResult = {
       ...result, candidates: [jsonlCandidate],
@@ -119,16 +121,43 @@ describe('Inspector tool folder browser', () => {
         counts: { config: 0, instruction: 0, conversation: 1, history: 0, log: 0 },
         folders: [{
           id: 'conversation', name: '会话记录', path: null, role: 'category', kind: 'conversation',
-          counts: { config: 0, instruction: 0, conversation: 1, history: 0, log: 0 }, children: [], files: [jsonlCandidate]
+          counts: { config: 0, instruction: 0, conversation: 1, history: 0, log: 0 },
+          children: [{
+            id: 'conversation-workspace-0', name: 'work', path: '/Users/demo/work', role: 'physical', kind: 'conversation',
+            counts: { config: 0, instruction: 0, conversation: 1, history: 0, log: 0 }, children: [], files: [jsonlCandidate]
+          }],
+          files: [jsonlCandidate]
         }]
       } : tool)
     }
     const api = makeApi()
     api.inspector.scanDirectory = vi.fn(async () => jsonlResult)
-    api.inspector.readJsonlPage = vi.fn(async (): Promise<JsonlPage> => ({
+    const initialPage: JsonlPage = {
       file: { path: jsonlCandidate.path, name: jsonlCandidate.name, sizeBytes: 120, modifiedAt: jsonlCandidate.modifiedAt, snapshotId: '120:1:1' },
-      entries: [{ offset: '0', byteLength: 50, rawPreview: '{"payload":{"type":"reasoning"}}', timestamp: '2026-07-21T09:00:00.000Z', tags: [{ label: '思考', tone: 'thinking' }], parseStatus: 'valid' }],
-      olderCursor: null, changed: false
+      entries: [{
+        offset: '0', byteLength: 50, rawPreview: '{"payload":{"type":"reasoning"}}', timestamp: '2026-07-21T09:00:00.000Z',
+        sessionId: 'session-demo', workspace: '/Users/demo/work', contentPreview: '排查模型调用错误',
+        tags: [{ label: '思考', tone: 'thinking' }], parseStatus: 'valid'
+      }],
+      olderCursor: null, changed: false, search: null
+    }
+    const searchPage: JsonlPage = {
+      ...initialPage,
+      entries: [{
+        offset: '90', byteLength: 80, rawPreview: '{"text":"模型返回不可解析错误"}', timestamp: '2026-06-11T03:24:18.000Z',
+        sessionId: 'session-demo', workspace: '/Users/demo/work', contentPreview: '模型返回不可解析错误',
+        tags: [{ label: '用户', tone: 'user' }], parseStatus: 'valid'
+      }],
+      search: { query: '不可解析', scannedEntries: 860, scannedBytes: 98_304, truncated: false }
+    }
+    api.inspector.readJsonlPage = vi.fn(async (input: JsonlPageRequest): Promise<JsonlPage> => input.query ? searchPage : initialPage)
+    api.inspector.searchJsonlWorkspace = vi.fn(async (): Promise<JsonlWorkspaceSearchResult> => ({
+      query: '不可解析',
+      hits: [{
+        file: { path: jsonlCandidate.path, name: jsonlCandidate.name, modifiedAt: jsonlCandidate.modifiedAt, snapshotId: '120:1:1' },
+        entry: searchPage.entries[0]
+      }],
+      scannedFiles: 1, totalFiles: 1, scannedEntries: 860, scannedBytes: 98_304, truncated: false
     }))
     api.inspector.readJsonlEntry = vi.fn(async (): Promise<JsonlEntryDetail> => ({
       offset: '0', raw: '{"payload":{"type":"reasoning"}}', formatted: '{\n  "payload": {\n    "type": "reasoning"\n  }\n}',
@@ -140,9 +169,23 @@ describe('Inspector tool folder browser', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /选择用户目录/ })[0])
     await waitFor(() => expect(screen.getByRole('button', { name: /会话记录.*对话、思考与工具调用记录/ })).toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: /会话记录.*对话、思考与工具调用记录/ }))
-    fireEvent.click(screen.getByRole('button', { name: '浏览记录' }))
-    await waitFor(() => expect(screen.getByText('{"payload":{"type":"reasoning"}}')).toBeInTheDocument())
-    fireEvent.click(screen.getByRole('button', { name: /思考.*payload/ }))
+    expect(screen.getByRole('button', { name: /work.*1 项/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '浏览会话' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /work.*1 项/ }))
+    expect(screen.getByText('排查模型调用错误')).toBeInTheDocument()
+    expect(screen.getByText(/2026.*07.*21.*:00:00/)).toBeInTheDocument()
+
+    fireEvent.change(screen.getByPlaceholderText('搜索这个 Workspace 中的问题、错误或模型输出…'), { target: { value: '不可解析' } })
+    fireEvent.click(screen.getByRole('button', { name: '搜索全部会话' }))
+    await waitFor(() => expect(screen.getByText('模型返回不可解析错误')).toBeInTheDocument())
+    expect(api.inspector.searchJsonlWorkspace).toHaveBeenCalledWith({
+      query: '不可解析', files: [{ path: jsonlCandidate.path, profileId: 'codex-events-v1' }]
+    })
+    expect(screen.getByText(/已扫描 1\/1 个会话、860 条记录/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '查看所在会话' }))
+    await waitFor(() => expect(api.inspector.readJsonlPage).toHaveBeenLastCalledWith(expect.objectContaining({ query: '不可解析' })))
+    fireEvent.click(screen.getByRole('button', { name: /用户.*模型返回不可解析错误/ }))
     await waitFor(() => expect(api.inspector.readJsonlEntry).toHaveBeenCalled())
     expect(screen.getByText(/"type": "reasoning"/)).toBeInTheDocument()
   })

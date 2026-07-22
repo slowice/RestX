@@ -6,8 +6,11 @@ import type {
   JsonlEventSummary,
   JsonlPage,
   JsonlPageRequest,
-  JsonlTag
+  JsonlTag,
+  JsonlWorkspaceSearchRequest,
+  JsonlWorkspaceSearchResult
 } from '../../shared/contracts/jsonl'
+import type { ConversationSessionSummary } from '../../shared/contracts/inspector'
 import { findJsonlProfile, type JsonlProfile } from '../presets/ai-tools'
 
 const PAGE_BYTES = 2 * 1024 * 1024
@@ -15,6 +18,14 @@ const MAX_ENTRY_BYTES = 1024 * 1024
 const DEFAULT_LIMIT = 100
 const MAX_LIMIT = 200
 const PREVIEW_CHARACTERS = 800
+const CONTENT_PREVIEW_CHARACTERS = 500
+const SEARCH_MAX_BYTES = 256 * 1024 * 1024
+const SEARCH_MAX_ENTRIES = 250_000
+const SEARCH_MAX_RESULTS = 200
+const SESSION_SUMMARY_BYTES = 512 * 1024
+const SESSION_SUMMARY_LINES = 300
+const WORKSPACE_MAX_FILES = 200
+const WORKSPACE_REQUEST_MAX_FILES = 500
 
 export class JsonlBrowserError extends Error {
   constructor(message: string, readonly code: string) {
@@ -79,6 +90,18 @@ function rawLabel(value: unknown): string | null {
   return label.length > 40 ? `${label.slice(0, 37)}…` : label
 }
 
+function profileText(value: unknown, paths: readonly string[] | undefined, maxCharacters: number): string | null {
+  for (const valuePath of paths ?? []) {
+    for (const candidate of valuesAtPath(value, valuePath)) {
+      if (!['string', 'number', 'boolean'].includes(typeof candidate)) continue
+      const text = String(candidate).replace(/\s+/g, ' ').trim()
+      if (!text) continue
+      return text.length > maxCharacters ? `${text.slice(0, maxCharacters - 1)}…` : text
+    }
+  }
+  return null
+}
+
 export function extractJsonlTags(value: unknown, profile: JsonlProfile): JsonlTag[] {
   const tags: JsonlTag[] = []
   const seen = new Set<string>()
@@ -121,6 +144,7 @@ function summarizeLine(line: LineSlice, profile: JsonlProfile): JsonlEventSummar
   if (line.byteLength > MAX_ENTRY_BYTES) {
     return {
       offset: String(line.offset), byteLength: line.byteLength, rawPreview, timestamp: null,
+      sessionId: null, workspace: null, contentPreview: null,
       tags: [{ label: '超大记录', tone: 'error' }], parseStatus: 'oversized'
     }
   }
@@ -128,13 +152,170 @@ function summarizeLine(line: LineSlice, profile: JsonlProfile): JsonlEventSummar
     const value: unknown = JSON.parse(withoutCarriageReturn.toString('utf8'))
     return {
       offset: String(line.offset), byteLength: line.byteLength, rawPreview,
-      timestamp: extractTimestamp(value, profile), tags: extractJsonlTags(value, profile), parseStatus: 'valid'
+      timestamp: extractTimestamp(value, profile),
+      sessionId: profileText(value, profile.sessionPaths, 200),
+      workspace: profileText(value, profile.workspacePaths, 500),
+      contentPreview: profileText(value, profile.summaryPaths, CONTENT_PREVIEW_CHARACTERS),
+      tags: extractJsonlTags(value, profile), parseStatus: 'valid'
     }
   } catch {
     return {
       offset: String(line.offset), byteLength: line.byteLength, rawPreview, timestamp: null,
+      sessionId: null, workspace: null, contentPreview: null,
       tags: [{ label: '格式异常', tone: 'error' }], parseStatus: 'invalid'
     }
+  }
+}
+
+export async function readJsonlSessionSummary({
+  path: filePath, profileId
+}: {
+  path: string
+  profileId: string
+}): Promise<ConversationSessionSummary> {
+  const profile = getProfile(profileId)
+  const { stat } = await inspectFile(filePath)
+  const length = Math.min(stat.size, SESSION_SUMMARY_BYTES)
+  const buffer = Buffer.alloc(length)
+  const handle = await open(filePath, 'r')
+  try {
+    if (length > 0) await handle.read(buffer, 0, length, 0)
+  } finally {
+    await handle.close()
+  }
+  const entries = splitLines(buffer, 0, true).slice(0, SESSION_SUMMARY_LINES).map((line) => summarizeLine(line, profile))
+  let sessionId: string | null = null
+  let workspace: string | null = null
+  let title: string | null = null
+  let fallbackTitle: string | null = null
+  let startedAt: string | null = null
+  for (const entry of entries) {
+    sessionId ??= entry.sessionId
+    workspace ??= entry.workspace
+    fallbackTitle ??= entry.contentPreview
+    if (!title && entry.contentPreview && entry.tags.some((tag) => tag.tone === 'user')) title = entry.contentPreview
+    if (entry.timestamp && (!startedAt || entry.timestamp < startedAt)) startedAt = entry.timestamp
+    if (sessionId && workspace && title && startedAt) break
+  }
+  return { sessionId, workspace, title: title ?? fallbackTitle, startedAt }
+}
+
+async function searchJsonl({
+  filePath, profile, size, query, maxBytes = SEARCH_MAX_BYTES,
+  maxEntries = SEARCH_MAX_ENTRIES, maxResults = SEARCH_MAX_RESULTS
+}: {
+  filePath: string
+  profile: JsonlProfile
+  size: number
+  query: string
+  maxBytes?: number
+  maxEntries?: number
+  maxResults?: number
+}): Promise<{ entries: JsonlEventSummary[]; scannedEntries: number; scannedBytes: number; truncated: boolean }> {
+  const entries: JsonlEventSummary[] = []
+  const normalizedQuery = query.toLowerCase()
+  let cursor = size
+  let scannedEntries = 0
+  let scannedBytes = 0
+  let truncated = false
+  const handle = await open(filePath, 'r')
+  try {
+    while (cursor > 0 && scannedEntries < maxEntries && scannedBytes < maxBytes && entries.length < maxResults) {
+      const chunkBytes = Math.min(PAGE_BYTES, maxBytes - scannedBytes)
+      const start = Math.max(0, cursor - chunkBytes)
+      const length = cursor - start
+      const buffer = Buffer.alloc(length)
+      if (length > 0) await handle.read(buffer, 0, length, start)
+      scannedBytes += length
+
+      const lines = splitLines(buffer, start, start === 0)
+      const firstNewline = start === 0 ? -1 : buffer.indexOf(10)
+      const candidateCursor = firstNewline >= 0 ? start + firstNewline + 1 : start
+      const nextCursor = start === 0 ? 0 : (candidateCursor < cursor ? candidateCursor : start)
+
+      let unscannedLines = false
+      for (let index = lines.length - 1; index >= 0; index -= 1) {
+        if (scannedEntries >= maxEntries || entries.length >= maxResults) {
+          unscannedLines = true
+          break
+        }
+        const line = lines[index]
+        scannedEntries += 1
+        if (line.bytes.toString('utf8').toLowerCase().includes(normalizedQuery)) entries.push(summarizeLine(line, profile))
+        if (entries.length >= maxResults && index > 0) unscannedLines = true
+      }
+
+      cursor = nextCursor
+      if (unscannedLines) {
+        truncated = true
+        break
+      }
+    }
+    truncated = truncated || cursor > 0
+  } finally {
+    await handle.close()
+  }
+  return { entries, scannedEntries, scannedBytes: Math.min(scannedBytes, size), truncated }
+}
+
+export async function searchJsonlWorkspace(request: JsonlWorkspaceSearchRequest): Promise<JsonlWorkspaceSearchResult> {
+  const query = request.query.trim()
+  if (!query || query.length > 200 || /[\u0000-\u001F\u007F]/.test(query)) {
+    throw new JsonlBrowserError('搜索内容无效，请输入 1 至 200 个可见字符。', 'INVALID_REQUEST')
+  }
+  if (request.files.length === 0 || request.files.length > WORKSPACE_REQUEST_MAX_FILES) {
+    throw new JsonlBrowserError('Workspace 会话文件数量无效。', 'INVALID_REQUEST')
+  }
+  const uniqueFiles = [...new Map(request.files.map((file) => [file.path, file])).values()]
+  const inspected = []
+  for (const file of uniqueFiles) {
+    const profile = getProfile(file.profileId)
+    const { stat, snapshotId } = await inspectFile(file.path)
+    inspected.push({ ...file, profile, stat, snapshotId })
+  }
+  inspected.sort((left, right) => right.stat.mtimeMs - left.stat.mtimeMs)
+
+  const hits: JsonlWorkspaceSearchResult['hits'] = []
+  let scannedFiles = 0
+  let scannedEntries = 0
+  let scannedBytes = 0
+  let truncated = inspected.length > WORKSPACE_MAX_FILES
+  for (const file of inspected.slice(0, WORKSPACE_MAX_FILES)) {
+    const remainingBytes = SEARCH_MAX_BYTES - scannedBytes
+    const remainingEntries = SEARCH_MAX_ENTRIES - scannedEntries
+    const remainingResults = SEARCH_MAX_RESULTS - hits.length
+    if (remainingBytes <= 0 || remainingEntries <= 0 || remainingResults <= 0) {
+      truncated = true
+      break
+    }
+    const result = await searchJsonl({
+      filePath: file.path, profile: file.profile, size: file.stat.size, query,
+      maxBytes: remainingBytes, maxEntries: remainingEntries, maxResults: remainingResults
+    })
+    scannedFiles += 1
+    scannedEntries += result.scannedEntries
+    scannedBytes += result.scannedBytes
+    hits.push(...result.entries.map((entry) => ({
+      file: {
+        path: file.path,
+        name: path.basename(file.path),
+        modifiedAt: file.stat.mtime.toISOString(),
+        snapshotId: file.snapshotId
+      },
+      entry
+    })))
+    if (result.truncated) {
+      truncated = true
+      break
+    }
+  }
+  if (scannedFiles < inspected.length) truncated = true
+  hits.sort((left, right) =>
+    (right.entry.timestamp ?? right.file.modifiedAt).localeCompare(left.entry.timestamp ?? left.file.modifiedAt)
+  )
+  return {
+    query, hits, scannedFiles, totalFiles: inspected.length,
+    scannedEntries, scannedBytes, truncated
   }
 }
 
@@ -159,6 +340,24 @@ function splitLines(buffer: Buffer, globalStart: number, includesFileStart: bool
 export async function readJsonlPage(request: JsonlPageRequest): Promise<JsonlPage> {
   const profile = getProfile(request.profileId)
   const { stat, snapshotId } = await inspectFile(request.path)
+  if (request.query !== undefined) {
+    const query = request.query.trim()
+    if (!query || query.length > 200 || /[\u0000-\u001F\u007F]/.test(query)) {
+      throw new JsonlBrowserError('搜索内容无效，请输入 1 至 200 个可见字符。', 'INVALID_REQUEST')
+    }
+    if (request.cursor !== undefined) throw new JsonlBrowserError('搜索请求不能包含 cursor。', 'INVALID_REQUEST')
+    const result = await searchJsonl({ filePath: request.path, profile, size: stat.size, query })
+    return {
+      file: {
+        path: request.path, name: path.basename(request.path), sizeBytes: stat.size,
+        modifiedAt: stat.mtime.toISOString(), snapshotId
+      },
+      entries: result.entries,
+      olderCursor: null,
+      changed: request.snapshotId !== undefined && request.snapshotId !== snapshotId,
+      search: { query, scannedEntries: result.scannedEntries, scannedBytes: result.scannedBytes, truncated: result.truncated }
+    }
+  }
   const end = parseInteger(request.cursor, stat.size, 'cursor')
   if (end > stat.size) throw new JsonlBrowserError('cursor 超出文件范围。', 'INVALID_REQUEST')
   const limit = Math.min(MAX_LIMIT, Math.max(1, request.limit ?? DEFAULT_LIMIT))
@@ -185,7 +384,8 @@ export async function readJsonlPage(request: JsonlPageRequest): Promise<JsonlPag
     },
     entries,
     olderCursor: hasOlderData ? String(earliestOffset) : null,
-    changed: request.snapshotId !== undefined && request.snapshotId !== snapshotId
+    changed: request.snapshotId !== undefined && request.snapshotId !== snapshotId,
+    search: null
   }
 }
 

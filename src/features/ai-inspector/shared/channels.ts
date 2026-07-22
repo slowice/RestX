@@ -4,6 +4,7 @@ export const aiInspectorChannels = {
   readConfig: 'feature:ai-inspector:read-config',
   readJsonlPage: 'feature:ai-inspector:read-jsonl-page',
   readJsonlEntry: 'feature:ai-inspector:read-jsonl-entry',
+  searchJsonlWorkspace: 'feature:ai-inspector:search-jsonl-workspace',
   revealInFolder: 'feature:ai-inspector:reveal-in-folder',
   getPreferences: 'feature:ai-inspector:get-preferences',
   setAiLocalAnalysisEnabled: 'feature:ai-inspector:set-ai-local-analysis-enabled',

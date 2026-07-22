@@ -31,6 +31,9 @@
   "jsonlProfiles": [{
     "id": "claude-code-events-v1",
     "timestampPaths": ["timestamp", "ts"],
+    "sessionPaths": ["sessionId", "session_id", "message.sessionId"],
+    "workspacePaths": ["project", "projectPath", "cwd", "message.cwd"],
+    "summaryPaths": ["display", "text", "message.content", "message.content[*].text", "message.content[*].thinking", "content"],
     "tagRules": [
       { "path": "type", "fallback": "raw-value", "values": {
         "user": { "label": "用户", "tone": "user" },
