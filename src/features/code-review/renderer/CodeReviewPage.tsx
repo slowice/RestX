@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ArrowRight, Bot, Braces, CheckCircle2, ChevronRight, CircleDot, Code2, FileCode2, FileSearch, GitPullRequest, KeyRound, Layers3, LoaderCircle, LockKeyhole, RefreshCw, Search, ShieldAlert, ShieldCheck, Sparkles, TestTube2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import type { CodeReviewResult, ReviewCategory, ReviewFinding, ReviewSeverity, ReviewSourcePreview, ReviewZone } from '../shared/contracts/code-review'
+import type { CodeReviewResult, GitCodeMergeRequestList, GitCodeMergeRequestSummary, MergeRequestReviewState, ReviewCategory, ReviewFinding, ReviewSeverity, ReviewSourcePreview, ReviewZone } from '../shared/contracts/code-review'
 import { PageHeader } from '../../../platform/renderer/components/PageHeader'
 import './code-review.css'
 
@@ -26,6 +26,26 @@ export function CodeReviewPage(): React.JSX.Element {
   const [error, setError] = useState('')
   const [severity, setSeverity] = useState<ReviewSeverity | 'all'>('all')
   const [category, setCategory] = useState<ReviewCategory | 'all'>('all')
+  const [mergeRequestList, setMergeRequestList] = useState<GitCodeMergeRequestList | null>(null)
+  const [mergeRequestListStatus, setMergeRequestListStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [mergeRequestListError, setMergeRequestListError] = useState('')
+
+  const loadMyMergeRequests = useCallback(async (): Promise<void> => {
+    setMergeRequestListStatus('loading')
+    setMergeRequestListError('')
+    try {
+      const next = await window.restx.codeReview.listMyGitCodeMergeRequests()
+      setMergeRequestList(next)
+      setMergeRequestListStatus('ready')
+    } catch (reason) {
+      setMergeRequestListError(errorMessage(reason))
+      setMergeRequestListStatus('error')
+    }
+  }, [])
+
+  useEffect(() => {
+    if (zone === 'blue') void loadMyMergeRequests()
+  }, [loadMyMergeRequests, zone])
 
   const resetOutput = (): void => {
     setPreview(null)
@@ -41,14 +61,14 @@ export function CodeReviewPage(): React.JSX.Element {
     resetOutput()
   }
 
-  const loadPreview = async (): Promise<void> => {
-    if (!url.trim()) return
+  const loadPreview = async (sourceUrl = url.trim()): Promise<void> => {
+    if (!sourceUrl) return
     setStatus('loading')
     setError('')
     setPreview(null)
     setResult(null)
     try {
-      const next = await window.restx.codeReview.previewSource({ url: url.trim(), zone })
+      const next = await window.restx.codeReview.previewSource({ url: sourceUrl, zone })
       setPreview(next)
       setStatus('ready')
     } catch (reason) {
@@ -64,6 +84,12 @@ export function CodeReviewPage(): React.JSX.Element {
     try {
       const next = await window.restx.codeReview.run({ url: url.trim(), zone, requirements: requirements.trim(), force })
       setResult(next)
+      setMergeRequestList((current) => current ? {
+        ...current,
+        mergeRequests: current.mergeRequests.map((mergeRequest) => mergeRequest.sourceId === next.sourceId
+          ? { ...mergeRequest, review: { status: next.findings.length ? 'issues' : 'passed', findingCount: next.findings.length, analyzedAt: next.analyzedAt } }
+          : mergeRequest)
+      } : current)
       setStatus('completed')
     } catch (reason) {
       setError(errorMessage(reason))
@@ -81,6 +107,13 @@ export function CodeReviewPage(): React.JSX.Element {
     P2: result?.findings.filter((item) => item.severity === 'P2').length ?? 0,
     P3: result?.findings.filter((item) => item.severity === 'P3').length ?? 0
   }), [result])
+
+  const selectMergeRequest = (mergeRequest: GitCodeMergeRequestSummary): void => {
+    const selectedUrl = mergeRequest.locator.webUrl
+    setUrl(selectedUrl)
+    resetOutput()
+    void loadPreview(selectedUrl)
+  }
 
   return (
     <div className="page code-review-page">
@@ -104,7 +137,15 @@ export function CodeReviewPage(): React.JSX.Element {
             <div><strong>{zone === 'blue' ? 'GitCode Pull Request' : 'CodeHub Merge Request'}</strong><small>{zone === 'blue' ? '官方 API v5 · 只读访问' : '适配框架已完成 · 待黄区补充 API'}</small></div>
             <b>{zone === 'blue' ? '可用' : '待接入'}</b>
           </div>
-          <label className="review-field"><span>MR / PR 链接</span><div className="review-url-input"><GitPullRequest size={16} /><input type="url" value={url} disabled={zone === 'yellow'} onChange={(event) => { setUrl(event.target.value); resetOutput() }} placeholder={zone === 'blue' ? 'https://gitcode.com/owner/repo/pull/123' : '进入黄区后配置 CodeHub 域名'} /></div></label>
+          {zone === 'blue' && <MyMergeRequests
+            data={mergeRequestList}
+            status={mergeRequestListStatus}
+            error={mergeRequestListError}
+            selectedUrl={url}
+            onRefresh={() => void loadMyMergeRequests()}
+            onSelect={selectMergeRequest}
+          />}
+          <label className="review-field"><span>{zone === 'blue' ? '或者手动粘贴链接' : 'MR / PR 链接'}</span><div className="review-url-input"><GitPullRequest size={16} /><input type="url" value={url} disabled={zone === 'yellow'} onChange={(event) => { setUrl(event.target.value); resetOutput() }} placeholder={zone === 'blue' ? 'https://gitcode.com/owner/repo/pull/123' : '进入黄区后配置 CodeHub 域名'} /></div></label>
           {zone === 'blue' && <button className="example-link" type="button" onClick={() => { setUrl('https://gitcode.com/OpenMatrix/MatrixAssistant/pull/1958'); resetOutput() }}>使用示例：MatrixAssistant #1958 <ArrowRight size={13} /></button>}
           {zone === 'yellow' && <div className="adapter-note"><LockKeyhole size={15} /><span>蓝区无法访问 CodeHub。进入黄区后只需补充 URL、认证和 diff 请求函数，页面与检视流程无需改动。</span></div>}
 
@@ -126,6 +167,55 @@ export function CodeReviewPage(): React.JSX.Element {
       </div>
     </div>
   )
+}
+
+function MyMergeRequests({ data, status, error, selectedUrl, onRefresh, onSelect }: {
+  data: GitCodeMergeRequestList | null
+  status: 'loading' | 'ready' | 'error'
+  error: string
+  selectedUrl: string
+  onRefresh: () => void
+  onSelect: (mergeRequest: GitCodeMergeRequestSummary) => void
+}): React.JSX.Element {
+  return <section className="my-merge-requests">
+    <header><div><strong>我的开放 MR</strong><small>按最近更新排序</small></div><button className="icon-button" type="button" title="刷新我的 MR" aria-label="刷新我的 MR" disabled={status === 'loading'} onClick={onRefresh}><RefreshCw className={status === 'loading' ? 'spin' : ''} size={14} /></button></header>
+    {status === 'loading' && <div className="mr-list-message"><LoaderCircle className="spin" size={15} /><span>正在匹配 Git 身份并读取 MR…</span></div>}
+    {status === 'error' && <div className="mr-list-error"><AlertTriangle size={15} /><span>{error}</span>{/PAT|认证|令牌/.test(error) && <Link to="/settings">前往设置</Link>}</div>}
+    {status === 'ready' && data && <>
+      <IdentityMatch identity={data.identity} />
+      <div className="mr-choice-list">
+        {data.mergeRequests.map((mergeRequest) => <button
+          className={`mr-choice${selectedUrl === mergeRequest.locator.webUrl ? ' selected' : ''}`}
+          type="button"
+          aria-pressed={selectedUrl === mergeRequest.locator.webUrl}
+          key={mergeRequest.sourceId}
+          onClick={() => onSelect(mergeRequest)}
+        >
+          <span className="mr-choice-main"><b>{mergeRequest.locator.owner}/{mergeRequest.locator.repository} #{mergeRequest.locator.number}</b><strong>{mergeRequest.draft ? '[草稿] ' : ''}{mergeRequest.title}</strong><small>{mergeRequest.headBranch} → {mergeRequest.baseBranch}{mergeRequest.updatedAt ? ` · ${formatDateTime(mergeRequest.updatedAt)}` : ''}</small></span>
+          <ReviewState state={mergeRequest.review} />
+        </button>)}
+        {!data.mergeRequests.length && <div className="mr-list-empty"><GitPullRequest size={18} /><span><b>当前没有开放 MR</b><small>仍可在下方手动粘贴其他 MR 链接</small></span></div>}
+      </div>
+    </>}
+  </section>
+}
+
+function IdentityMatch({ identity }: { identity: GitCodeMergeRequestList['identity'] }): React.JSX.Element {
+  const copy = identity.match === 'matched'
+    ? `已匹配本地 Git：${identity.localGitEmail}`
+    : identity.match === 'mismatched'
+      ? `PAT 账号与本地邮箱不一致：${identity.localGitEmail}`
+      : identity.match === 'local-email-unavailable'
+        ? '未配置全局 Git 邮箱，当前按 PAT 账号展示'
+        : 'GitCode 未返回邮箱，当前按 PAT 账号展示'
+  return <div className={`git-identity ${identity.match}`}><CircleDot size={13} /><span><b>{identity.accountName}</b><small>{copy}</small></span></div>
+}
+
+function ReviewState({ state }: { state: MergeRequestReviewState }): React.JSX.Element {
+  if (state.status === 'passed') return <span className="mr-review-state passed"><CheckCircle2 size={12} />检视通过</span>
+  if (state.status === 'issues') return <span className="mr-review-state issues"><AlertTriangle size={12} />{state.findingCount ?? 0} 个问题</span>
+  if (state.status === 'stale') return <span className="mr-review-state stale"><RefreshCw size={12} />代码已更新</span>
+  return <span className="mr-review-state unreviewed">未检视</span>
 }
 
 function ReviewWelcome({ zone }: { zone: ReviewZone }): React.JSX.Element {
@@ -157,4 +247,5 @@ function FindingCard({ finding }: { finding: ReviewFinding }): React.JSX.Element
 function statusLabel(status: ReviewSourcePreview['files'][number]['status']): string { return ({ added: '新增', modified: '修改', deleted: '删除', renamed: '重命名', unknown: '变更' })[status] }
 function confidenceLabel(value: ReviewFinding['confidence']): string { return ({ high: '高', medium: '中', low: '低' })[value] }
 function formatCharacters(value: number): string { return value >= 1000 ? `${(value / 1000).toFixed(1)}K` : String(value) }
+function formatDateTime(value: string): string { const time = Date.parse(value); return Number.isFinite(time) ? new Date(time).toLocaleDateString() : value }
 function errorMessage(reason: unknown): string { return reason instanceof Error ? reason.message.replace(/^Error invoking remote method '[^']+': Error: /, '') : '操作失败，请稍后重试。' }

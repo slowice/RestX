@@ -9,6 +9,7 @@ export const codeReviewPreloadFeature = definePreloadFeature({
   createApi(invoke): CodeReviewApi {
     return {
       codeReview: {
+        listMyGitCodeMergeRequests: () => invoke(channels.listMyGitCodeMergeRequests),
         previewSource: (input) => invoke(channels.previewSource, input),
         run: (input) => invoke(channels.run, input),
         getGitCodeSettings: () => invoke(channels.getGitCodeSettings),

@@ -88,6 +88,14 @@ Provider 配置按区域独立持久化。首版蓝区可以读取已有 Provide
 
 区域模型配置由代码自检特性独立持久化，不直接导入 AI Inspector 的内部 Provider 服务。设置页通过 code-review 的公开 renderer 入口渲染配置区，并以 `code-review.renderer` capability 显式声明依赖，避免跨特性私有导入。
 
+### 12. GitCode 当前用户列表以 PAT 身份为准并用本地 Git 邮箱校验
+
+主进程使用参数化 `git config --global --get user.email` 读取本机 Git 邮箱，不执行 shell，也不读取仓库内容。GitCode PAT 对应的 `/user` 与 `/emails` 响应用于邮箱匹配和账号展示；MR 列表使用官方 `/user/pulls` 接口，并显式限定 `scope=created_by_me`、`state=open`、按更新时间倒序和首屏数量上限。
+
+PAT 授权账号是列表归属的权威身份，本地 Git 邮箱只用于确认和提示，避免从邮箱字符串猜测 GitCode 用户名。邮箱缺失或不一致时仍可展示 PAT 账号的 MR，但页面必须清楚标识身份状态。粘贴链接继续作为兼容和异常情况下的后备入口。
+
+检视状态不回写 GitCode，而是从现有七天加密缓存中按规范化 MR 身份和 head SHA 推导。当前 SHA 的结果无 finding 时显示“检视通过”，有 finding 时显示问题数量；只存在旧 SHA 结果时显示“代码已更新”，不能沿用旧通过状态。清除缓存会同时移除这些本地状态。
+
 ## Risks / Trade-offs
 
 - **[GitCode API 方言与文档不完全一致]** → 同时接受 `/pull/`、`/pulls/` 链接，响应使用运行时校验，并给出可理解的认证或格式错误。
@@ -98,6 +106,8 @@ Provider 配置按区域独立持久化。首版蓝区可以读取已有 Provide
 - **[缓存包含代码证据]** → 加密、七天 TTL、输入变化失效和手动清理；安全存储不可用时仅内存缓存。
 - **[大型 PR 超出模型上下文]** → 文件和字符预算、发送预览、分批调用及明确的排除项，不静默截断。
 - **[worktree 分支最终仍可能与 dev 冲突]** → 尽量新增独立文件，公共模块只做最小接线，合并前同步 dev 并运行完整验证。
+- **[本地 Git 邮箱与 PAT 账号不一致]** → PAT 身份保持权威，邮箱只做可见校验，不据此过滤或冒充其他账号。
+- **[MR 新提交沿用旧检视标识]** → 状态与 head SHA 绑定；SHA 变化后只显示过期，不显示通过。
 
 ## Migration Plan
 

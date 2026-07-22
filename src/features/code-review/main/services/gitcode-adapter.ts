@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import type { MergeRequestLocator, ReviewFileStatus } from '../../shared/contracts/code-review'
+import type { GitCodeIdentityMatch, GitCodeMergeRequestList, GitCodeMergeRequestSummary, MergeRequestLocator, ReviewFileStatus } from '../../shared/contracts/code-review'
 import { MergeRequestSourceAdapter, parseChangedNewLines, ReviewSourceError, type LoadedReviewSource } from './code-review-source'
 
 export const GITCODE_API_BASE_URL = 'https://api.gitcode.com/api/v5'
@@ -32,6 +32,21 @@ function branchValue(value: unknown): { ref: string; sha: string } {
     sha: requiredString(branch.sha ?? branch.commit_id ?? (branch.commit as Record<string, unknown> | undefined)?.id, 'sha')
   }
 }
+
+function recordValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+}
+
+function arrayValue(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value
+  const record = recordValue(value)
+  const nested = record.pull_requests ?? record.merge_requests ?? record.items
+  return Array.isArray(nested) ? nested : []
+}
+
+function normalizedEmail(value: string): string {
+  return value.trim().toLowerCase()
+}
 function normalizeStatus(value: unknown, patch: Record<string, unknown>): ReviewFileStatus {
   if (patch.new_file === true || value === 'added') return 'added'
   if (patch.deleted_file === true || value === 'removed' || value === 'deleted') return 'deleted'
@@ -63,6 +78,45 @@ export class GitCodeAdapter implements MergeRequestSourceAdapter {
     const repository = decodeURIComponent(match[2]).replace(/\.git$/, '')
     const number = Number(match[3])
     return { platform: 'gitcode', zone: 'blue', owner, repository, number, webUrl: `https://gitcode.com/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}/pull/${number}` }
+  }
+
+  async listMine(localGitEmail: string | null): Promise<GitCodeMergeRequestList> {
+    const token = this.options.getAccessToken().trim()
+    if (!token) throw new ReviewSourceError('请先在设置中配置 GitCode 个人访问令牌（PAT）。', 'AUTHENTICATION_REQUIRED')
+    const pullsPath = '/user/pulls?scope=created_by_me&state=open&sort=updated&direction=desc&per_page=50&page=1'
+    const [profileValue, pullsValue, emailsValue] = await Promise.all([
+      this.request('/user', token),
+      this.request(pullsPath, token),
+      this.optionalRequest('/emails', token)
+    ])
+    const profile = recordValue(profileValue)
+    const accountLogin = requiredString(profile.login ?? profile.username, 'login')
+    if (!accountLogin) throw new ReviewSourceError('GitCode 当前用户信息缺少账号标识。', 'INVALID_RESPONSE')
+    const accountName = requiredString(profile.name, 'name', accountLogin)
+    const remoteEmails = new Set<string>()
+    const profileEmail = requiredString(profile.email, 'email')
+    if (profileEmail) remoteEmails.add(normalizedEmail(profileEmail))
+    for (const value of arrayValue(emailsValue)) {
+      const emailRecord = recordValue(value)
+      const email = requiredString(emailRecord.email, 'email')
+      if (email && (emailRecord.state === undefined || emailRecord.state === 'confirmed')) remoteEmails.add(normalizedEmail(email))
+    }
+    const localNormalized = localGitEmail ? normalizedEmail(localGitEmail) : ''
+    const match: GitCodeIdentityMatch = !localNormalized
+      ? 'local-email-unavailable'
+      : remoteEmails.size === 0
+        ? 'remote-email-unavailable'
+        : remoteEmails.has(localNormalized) ? 'matched' : 'mismatched'
+
+    const mergeRequests = arrayValue(pullsValue)
+      .slice(0, 50)
+      .map((value) => this.parseMergeRequestSummary(value))
+      .filter((value): value is GitCodeMergeRequestSummary => value !== null)
+    return {
+      identity: { localGitEmail, accountLogin, accountName, match },
+      mergeRequests,
+      fetchedAt: new Date().toISOString()
+    }
   }
 
   async load(locator: MergeRequestLocator): Promise<LoadedReviewSource> {
@@ -151,6 +205,44 @@ export class GitCodeAdapter implements MergeRequestSourceAdapter {
       return await response.json()
     } catch {
       throw new ReviewSourceError('GitCode 返回了无法读取的响应。', 'INVALID_RESPONSE')
+    }
+  }
+
+  private async optionalRequest(path: string, token: string): Promise<unknown> {
+    try {
+      return await this.request(path, token)
+    } catch {
+      return null
+    }
+  }
+
+  private parseMergeRequestSummary(value: unknown): GitCodeMergeRequestSummary | null {
+    const item = recordValue(value)
+    const webUrl = requiredString(item.html_url ?? item.web_url, 'htmlUrl')
+    if (!webUrl) return null
+    let locator: MergeRequestLocator
+    try {
+      locator = this.parseUrl(new URL(webUrl))
+    } catch {
+      return null
+    }
+    const base = branchValue(item.base ?? item.target)
+    const head = branchValue(item.head ?? item.source)
+    const user = recordValue(item.user ?? item.author)
+    const headSha = head.sha || requiredString(item.head_sha ?? item.sha, 'headSha')
+    const updatedAt = requiredString(item.updated_at ?? item.updatedAt, 'updatedAt') || null
+    return {
+      sourceId: `gitcode:${locator.owner}/${locator.repository}#${locator.number}@${headSha || 'unknown'}`,
+      locator,
+      title: requiredString(item.title, 'title', `PR #${locator.number}`),
+      state: requiredString(item.state ?? item.status, 'state', 'open'),
+      author: requiredString(user.name ?? user.login ?? user.username, 'author') || null,
+      baseBranch: base.ref || requiredString(item.target_branch ?? item.base_branch, 'baseBranch', '未知目标分支'),
+      headBranch: head.ref || requiredString(item.source_branch ?? item.head_branch, 'headBranch', '未知来源分支'),
+      headSha,
+      updatedAt,
+      draft: item.draft === true || item.work_in_progress === true,
+      review: { status: 'unreviewed' }
     }
   }
 }

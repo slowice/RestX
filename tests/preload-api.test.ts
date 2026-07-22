@@ -22,12 +22,14 @@ describe('preload API composition', () => {
     await api.app.getVersion()
     await api.app.getPreferences()
     await api.inspector.chooseDirectory()
+    await api.codeReview.listMyGitCodeMergeRequests()
     await api.codeReview.getGitCodeSettings()
 
     expect(calls).toHaveBeenNthCalledWith(1, platformChannels.getVersion)
     expect(calls).toHaveBeenNthCalledWith(2, aiInspectorChannels.getPreferences)
     expect(calls).toHaveBeenNthCalledWith(3, aiInspectorChannels.chooseDirectory)
-    expect(calls).toHaveBeenNthCalledWith(4, codeReviewChannels.getGitCodeSettings)
+    expect(calls).toHaveBeenNthCalledWith(4, codeReviewChannels.listMyGitCodeMergeRequests)
+    expect(calls).toHaveBeenNthCalledWith(5, codeReviewChannels.getGitCodeSettings)
   })
 
   it('rejects duplicate API methods', () => {

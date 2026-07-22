@@ -36,6 +36,21 @@ RestX MUST NOT modify source files, run repository scripts, fetch remotes, creat
 - **WHEN** review results are displayed
 - **THEN** no write request has been sent to GitCode or CodeHub and no repository content has changed
 
+### Requirement: Pull Request list shows local review status
+RestX SHALL annotate listed Pull Requests using the local encrypted review cache and the current Pull Request head SHA.
+
+#### Scenario: Current revision has no findings
+- **WHEN** the latest cached result for the Pull Request's current head SHA contains no findings
+- **THEN** the list shows a “检视通过” marker beside that Pull Request
+
+#### Scenario: Current revision has findings
+- **WHEN** the latest cached result for the current head SHA contains findings
+- **THEN** the list shows the finding count and does not show the Pull Request as passed
+
+#### Scenario: Pull Request receives a new commit
+- **WHEN** only a result for an older head SHA exists
+- **THEN** the list shows that the code has changed and requires a new review
+
 ### Requirement: Code review matches the RestX visual language
 RestX SHALL present the code review workspace with the application's light surfaces, neutral borders, and green interaction accent while retaining blue and yellow as explicit network-zone semantics.
 

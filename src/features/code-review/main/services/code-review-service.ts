@@ -1,20 +1,37 @@
 import { createHash, randomUUID } from 'node:crypto'
-import type { CodeReviewResult, GitCodeConnectionStatus, PreviewReviewSourceInput, ReviewFinding, ReviewSourcePreview, RunCodeReviewInput } from '../../shared/contracts/code-review'
+import type { CodeReviewResult, GitCodeConnectionStatus, GitCodeMergeRequestList, PreviewReviewSourceInput, ReviewFinding, ReviewSourcePreview, RunCodeReviewInput } from '../../shared/contracts/code-review'
 import { CodeHubAdapter } from './codehub-adapter'
 import { buildReviewBatches, CODE_REVIEW_PROMPT_VERSION, reviewCodeBatch } from './code-review-provider'
 import { MergeRequestAdapterRegistry, ReviewSourceError } from './code-review-source'
 import { getCodeReviewCache, type CodeReviewCache } from './code-review-cache'
 import { GitCodeAdapter, GITCODE_API_BASE_URL } from './gitcode-adapter'
 import { gitCodeSettings } from './gitcode-settings'
+import { readGlobalGitEmail } from './local-git-identity'
 import { selectReviewRulePacks } from './review-rule-packs'
 import { reviewZoneSettings } from './review-zone-settings'
 import { writeReviewAudit } from './review-audit-logger'
 
 export class CodeReviewService {
-  constructor(private readonly reviewCache?: CodeReviewCache, private readonly gitCode = new GitCodeAdapter({ getAccessToken: () => gitCodeSettings.getSecret() })) {}
+  constructor(
+    private readonly reviewCache?: CodeReviewCache,
+    private readonly gitCode = new GitCodeAdapter({ getAccessToken: () => gitCodeSettings.getSecret() }),
+    private readonly readGitEmail: () => Promise<string | null> = readGlobalGitEmail
+  ) {}
 
   private registry(): MergeRequestAdapterRegistry {
     return new MergeRequestAdapterRegistry([this.gitCode, new CodeHubAdapter()])
+  }
+
+  async listMyGitCodeMergeRequests(): Promise<GitCodeMergeRequestList> {
+    const list = await this.gitCode.listMine(await this.readGitEmail())
+    const cache = this.reviewCache ?? getCodeReviewCache()
+    return {
+      ...list,
+      mergeRequests: list.mergeRequests.map((mergeRequest) => ({
+        ...mergeRequest,
+        review: cache.getReviewState(mergeRequest.sourceId)
+      }))
+    }
   }
 
   async preview(input: PreviewReviewSourceInput): Promise<ReviewSourcePreview> {
@@ -97,6 +114,7 @@ function getCodeReviewService(): CodeReviewService {
 }
 
 export const codeReviewService = {
+  listMyGitCodeMergeRequests: (): Promise<GitCodeMergeRequestList> => getCodeReviewService().listMyGitCodeMergeRequests(),
   preview: (input: PreviewReviewSourceInput): Promise<ReviewSourcePreview> => getCodeReviewService().preview(input),
   run: (input: RunCodeReviewInput): Promise<CodeReviewResult> => getCodeReviewService().run(input),
   testGitCodeConnection: (): Promise<GitCodeConnectionStatus> => getCodeReviewService().testGitCodeConnection()

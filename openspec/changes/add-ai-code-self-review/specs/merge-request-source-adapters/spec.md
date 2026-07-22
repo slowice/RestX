@@ -33,6 +33,21 @@ RestX MUST store the GitCode PAT with operating-system secure storage and MUST s
 - **WHEN** RestX records GitCode request diagnostics
 - **THEN** the log contains neither the PAT nor a URL query parameter containing the PAT
 
+### Requirement: GitCode current-user pull requests are discoverable
+RestX SHALL read the authenticated GitCode user's currently open, self-created Pull Requests through the official current-user API and SHALL use the local global Git email only to verify the account identity.
+
+#### Scenario: Local Git email matches the authorized account
+- **WHEN** the configured global Git email is present among the GitCode account's confirmed emails
+- **THEN** RestX shows the account as matched and lists its open Pull Requests ordered by recent updates
+
+#### Scenario: Local Git email does not match
+- **WHEN** the local Git email is absent or differs from the PAT account emails
+- **THEN** RestX clearly shows the unmatched identity state while keeping the PAT account as the authoritative list owner
+
+#### Scenario: User selects a listed Pull Request
+- **WHEN** the user chooses an item from the current-user Pull Request list
+- **THEN** RestX uses its normalized web URL in the existing source-preview flow without requiring manual paste
+
 ### Requirement: CodeHub has an explicit extension boundary
 RestX SHALL register a yellow-zone CodeHub adapter contract even when platform API details are not yet available.
 

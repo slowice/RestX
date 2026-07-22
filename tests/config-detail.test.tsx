@@ -35,7 +35,7 @@ function makeApi(consent: boolean): RestXApi {
       clearAnalysisCache: vi.fn()
     },
     presets: { list: vi.fn(async () => []), generateDraft: vi.fn(), save: vi.fn(), setEnabled: vi.fn(), delete: vi.fn() },
-    codeReview: { previewSource: vi.fn(), run: vi.fn(), getGitCodeSettings: vi.fn(), updateGitCodeSettings: vi.fn(), testGitCodeConnection: vi.fn(), getZoneProviders: vi.fn(), updateZoneProvider: vi.fn(), clearCache: vi.fn() }
+    codeReview: { listMyGitCodeMergeRequests: vi.fn(), previewSource: vi.fn(), run: vi.fn(), getGitCodeSettings: vi.fn(), updateGitCodeSettings: vi.fn(), testGitCodeConnection: vi.fn(), getZoneProviders: vi.fn(), updateZoneProvider: vi.fn(), clearCache: vi.fn() }
   }
 }
 
