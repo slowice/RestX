@@ -1,6 +1,8 @@
 import { app, BrowserWindow } from 'electron'
 import path from 'node:path'
-import { registerIpcHandlers } from './ipc'
+import { registerApplication } from '../platform/main/register-platform'
+
+let disposeApplication: (() => void) | null = null
 
 function createWindow(): void {
   const window = new BrowserWindow({
@@ -25,13 +27,21 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
-  void registerIpcHandlers().then(() => {
-    createWindow()
-    app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow()
-    })
+app.whenReady().then(async () => {
+  disposeApplication = await registerApplication()
+  createWindow()
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+}).catch((reason: unknown) => {
+  const message = reason instanceof Error ? reason.message : '未知启动错误'
+  console.error(`RestX startup failed: ${message}`)
+  app.quit()
+})
+
+app.once('will-quit', () => {
+  disposeApplication?.()
+  disposeApplication = null
 })
 
 app.on('window-all-closed', () => {

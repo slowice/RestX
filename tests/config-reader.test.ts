@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { parseConfigText, readConfigDocument, redactConfigValue } from '../src/main/services/config-reader'
+import { parseConfigText, readConfigDocument, redactConfigValue } from '../src/features/ai-inspector/main/services/config-reader'
 
 const temporaryDirectories: string[] = []
 

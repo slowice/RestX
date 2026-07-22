@@ -1,0 +1,22 @@
+.settings-page { max-width: 920px; }.settings-section { margin-bottom: 16px; overflow: hidden; border: 1px solid #222c3b; border-radius: 14px; background: #101620; }.settings-title { display: flex; gap: 12px; padding: 19px 20px; border-bottom: 1px solid #202938; }.settings-title > svg { margin-top: 2px; color: #9282f7; }.settings-title h2 { margin: 0 0 5px; font-size: 13px; }.settings-title p { margin: 0; color: #758195; font-size: 10px; }.setting-row { display: flex; min-height: 75px; align-items: center; justify-content: space-between; gap: 24px; padding: 16px 20px; border-bottom: 1px solid #1d2633; }.setting-row:last-child { border-bottom: 0; }.setting-row > div { display: flex; min-width: 0; flex-direction: column; gap: 5px; }.setting-row strong { font-size: 11px; }.setting-row span { color: #6f7c8f; font-size: 9px; }.setting-row .path-value { max-width: 590px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.runtime-badge { display: flex; align-items: center; gap: 7px; padding: 7px 10px; border: 1px solid #2b3444; border-radius: 20px; background: #151c26; white-space: nowrap; }.runtime-badge i { width: 6px; height: 6px; border-radius: 50%; background: #778295; }.runtime-badge.ready i { background: var(--mint); box-shadow: 0 0 7px var(--mint); }.runtime-badge.error i { background: var(--danger); }.runtime-badge.starting i { background: #e9bd65; }
+.switch-row { cursor: default; }.switch { position: relative; width: 38px; height: 22px; flex: none; padding: 0; border: 0; border-radius: 20px; background: #303a49; cursor: pointer; transition: .2s; }.switch span { position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #a5afbd; transition: .2s; }.switch.on { background: #7663e9; }.switch.on span { left: 19px; background: white; }
+.privacy-grid { display: grid; grid-template-columns: 1fr 1fr; }.privacy-grid > div { display: grid; grid-template-columns: 31px 1fr; padding: 20px; }.privacy-grid > div + div { border-left: 1px solid #202938; }.privacy-grid svg { grid-row: span 2; color: #55c9aa; }.privacy-grid strong { font-size: 11px; }.privacy-grid span { margin-top: 4px; color: #6d798d; font-size: 9px; }
+.settings-section { border-color: #e3e3e3; background: #fff; }
+.settings-title, .setting-row { border-color: #ececec; }
+.settings-title > svg { color: #10a37f; }
+.settings-title h2, .setting-row strong, .privacy-grid strong { color: #222; }
+.settings-title p, .setting-row span, .privacy-grid span { color: #707070; }
+.runtime-badge { color: #555; border-color: #dedede; background: #f7f7f7; }
+.runtime-badge.ready i { background: #10a37f; box-shadow: none; }
+.switch { background: #c9c9c9; }
+.switch span { background: #fff; }
+.switch.on { background: #10a37f; }
+.privacy-grid > div + div { border-color: #ececec; }
+.privacy-grid svg { color: #10a37f; }
+.settings-notice { display: flex; align-items: center; gap: 8px; margin: -12px 0 15px; padding: 10px 12px; border: 1px solid; border-radius: 9px; font-size: 10px; }.settings-notice.success { color: #087d62; border-color: #bfe8dc; background: #edf9f5; }.settings-notice.error { color: #aa242c; border-color: #efc7ca; background: #fff7f7; }
+.provider-section .settings-title { align-items: flex-start; }.provider-section .runtime-badge { margin-left: auto; }
+.provider-form { display: grid; grid-template-columns: 1.3fr .7fr; gap: 14px; padding: 18px 20px; border-bottom: 1px solid #ececec; }
+.provider-form label { display: flex; flex-direction: column; gap: 6px; }.provider-form label:nth-child(3) { grid-column: 1 / -1; }.provider-form label > span { display: flex; align-items: center; gap: 6px; color: #333; font-size: 10px; font-weight: 600; }.provider-form label > span svg { color: #10a37f; }
+.provider-form input { width: 100%; height: 38px; padding: 0 11px; color: #222; border: 1px solid #d7d7d7; border-radius: 8px; outline: 0; background: #fff; font-size: 10px; transition: .15s; }.provider-form input:focus { border-color: #10a37f; box-shadow: 0 0 0 3px rgba(16, 163, 127, .09); }.provider-form input::placeholder { color: #aaa; }.provider-form small { color: #888; font-size: 8px; }
+.provider-actions { grid-column: 1 / -1; display: flex; gap: 8px; }

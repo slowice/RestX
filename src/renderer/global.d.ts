@@ -1,4 +1,4 @@
-import type { RestXApi } from '../shared/contracts/api'
+import type { RestXApi } from '../app-api'
 
 declare global {
   interface Window {

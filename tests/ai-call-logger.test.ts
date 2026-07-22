@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('electron', () => ({ app: { getPath: () => '/Users/demo' } }))
 
-import { formatLogTimestamp, getAiLogDirectory } from '../src/main/services/ai-call-logger'
+import { formatLogTimestamp, getAiLogDirectory } from '../src/features/ai-inspector/main/services/ai-call-logger'
 
 describe('AI call logger', () => {
   it('uses the hidden RestX log directory in the user home', () => {

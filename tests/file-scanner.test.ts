@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { classifyCandidate, scanDirectory, sortScanCandidates } from '../src/main/services/file-scanner'
-import type { ScanCandidate } from '../src/shared/contracts/inspector'
+import { classifyCandidate, scanDirectory, sortScanCandidates } from '../src/features/ai-inspector/main/services/file-scanner'
+import type { ScanCandidate } from '../src/features/ai-inspector/shared/contracts/inspector'
 
 const temporaryDirectories: string[] = []
 

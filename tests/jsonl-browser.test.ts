@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { readJsonlEntry, readJsonlPage } from '../src/main/services/jsonl-browser'
+import { readJsonlEntry, readJsonlPage } from '../src/features/ai-inspector/main/services/jsonl-browser'
 
 const temporaryDirectories: string[] = []
 

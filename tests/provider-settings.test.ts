@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ProviderSettingsManager, type ProviderSettingsStorage, type SecretCrypto } from '../src/main/services/provider-settings'
+import { ProviderSettingsManager, type ProviderSettingsStorage, type SecretCrypto } from '../src/features/ai-inspector/main/services/provider-settings'
 
 class MemoryStorage implements ProviderSettingsStorage {
   values = new Map<string, unknown>()

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { collectPresetInventory } from '../src/main/services/preset-inventory'
+import { collectPresetInventory } from '../src/features/ai-inspector/main/services/preset-inventory'
 
 const temporaryDirectories: string[] = []
 afterEach(async () => Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true }))))

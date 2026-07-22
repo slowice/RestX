@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { AiConfigAnalysis } from '../src/shared/contracts/ai-capability'
-import type { ConfigDocument } from '../src/shared/contracts/config'
-import { AnalysisCache, type AnalysisCacheStorage } from '../src/main/services/analysis-cache'
-import { ConfigAnalysisService } from '../src/main/services/config-analysis-service'
+import type { AiConfigAnalysis } from '../src/features/ai-inspector/shared/contracts/ai-capability'
+import type { ConfigDocument } from '../src/features/ai-inspector/shared/contracts/config'
+import { AnalysisCache, type AnalysisCacheStorage } from '../src/features/ai-inspector/main/services/analysis-cache'
+import { ConfigAnalysisService } from '../src/features/ai-inspector/main/services/config-analysis-service'
 
 class MemoryCacheStorage implements AnalysisCacheStorage {
   value: unknown = {}

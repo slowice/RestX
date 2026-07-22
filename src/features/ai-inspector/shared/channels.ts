@@ -1,0 +1,22 @@
+export const aiInspectorChannels = {
+  chooseDirectory: 'feature:ai-inspector:choose-directory',
+  scanDirectory: 'feature:ai-inspector:scan-directory',
+  readConfig: 'feature:ai-inspector:read-config',
+  readJsonlPage: 'feature:ai-inspector:read-jsonl-page',
+  readJsonlEntry: 'feature:ai-inspector:read-jsonl-entry',
+  revealInFolder: 'feature:ai-inspector:reveal-in-folder',
+  getPreferences: 'feature:ai-inspector:get-preferences',
+  setAiLocalAnalysisEnabled: 'feature:ai-inspector:set-ai-local-analysis-enabled',
+  clearHistory: 'feature:ai-inspector:clear-history',
+  getRuntimeStatus: 'feature:ai-inspector:get-runtime-status',
+  getProviderSettings: 'feature:ai-inspector:get-provider-settings',
+  updateProviderSettings: 'feature:ai-inspector:update-provider-settings',
+  analyzeConfig: 'feature:ai-inspector:analyze-config',
+  getCachedAnalysis: 'feature:ai-inspector:get-cached-analysis',
+  clearAnalysisCache: 'feature:ai-inspector:clear-analysis-cache',
+  listPresets: 'feature:ai-inspector:list-presets',
+  generatePresetDraft: 'feature:ai-inspector:generate-preset-draft',
+  savePreset: 'feature:ai-inspector:save-preset',
+  setPresetEnabled: 'feature:ai-inspector:set-preset-enabled',
+  deletePreset: 'feature:ai-inspector:delete-preset'
+} as const

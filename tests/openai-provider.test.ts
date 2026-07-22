@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { ConfigDocument } from '../src/shared/contracts/config'
-import type { AiCallLogEvent } from '../src/main/services/ai-call-logger'
-import { analyzeWithOpenAiCompatible, normalizeBaseUrl, parseAnalysisResponse, ProviderError } from '../src/main/services/openai-provider'
+import type { ConfigDocument } from '../src/features/ai-inspector/shared/contracts/config'
+import type { AiCallLogEvent } from '../src/features/ai-inspector/main/services/ai-call-logger'
+import { analyzeWithOpenAiCompatible, normalizeBaseUrl, parseAnalysisResponse, ProviderError } from '../src/features/ai-inspector/main/services/openai-provider'
 
 const document: ConfigDocument = {
   path: '/authorized/config.json',

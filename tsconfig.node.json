@@ -8,5 +8,17 @@
     "skipLibCheck": true,
     "types": ["node", "electron-vite/node"]
   },
-  "include": ["electron.vite.config.ts", "src/main/**/*.ts", "src/preload/**/*.ts", "src/shared/**/*.ts", "tests/**/*.ts"]
+  "include": [
+    "electron.vite.config.ts",
+    "src/app-api.ts",
+    "src/main/**/*.ts",
+    "src/preload/**/*.ts",
+    "src/platform/shared/**/*.ts",
+    "src/platform/main/**/*.ts",
+    "src/platform/preload/**/*.ts",
+    "src/features/*/shared/**/*.ts",
+    "src/features/*/main/**/*.ts",
+    "src/features/*/preload/**/*.ts",
+    "tests/**/*.ts"
+  ]
 }
