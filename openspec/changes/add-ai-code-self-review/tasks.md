@@ -47,3 +47,11 @@
 - [x] 7.2 Register namespaced main, preload, and renderer feature contributions without restoring legacy central directories
 - [x] 7.3 Isolate blue/yellow provider storage and expose code-review settings through a public renderer entry and capability
 - [x] 7.4 Adapt existing tests to the composed RestX API and pass feature-boundary, typecheck, test, and production build validation
+
+## 8. Current-user Pull Request discovery
+
+- [x] 8.1 Add shared contracts and preload IPC for local Git identity and current-user GitCode Pull Request summaries
+- [x] 8.2 Implement safe global Git email discovery, GitCode identity matching, and authenticated open Pull Request listing
+- [x] 8.3 Derive per-Pull Request passed, issues, stale, or unreviewed state from the encrypted seven-day cache and current head SHA
+- [x] 8.4 Add the selectable Pull Request list, identity state, refresh action, manual-link fallback, and immediate review-status updates to the workbench
+- [x] 8.5 Add adapter, cache, IPC, and renderer tests, then run typecheck, test, build, and diff validation

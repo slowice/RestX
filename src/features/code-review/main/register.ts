@@ -64,6 +64,7 @@ export const codeReviewMainFeature = defineMainFeature({
   provides: ['code-review.main'],
   channels: Object.values(channels),
   register({ ipc }) {
+    ipc.handle(channels.listMyGitCodeMergeRequests, () => codeReviewService.listMyGitCodeMergeRequests())
     ipc.handle(channels.previewSource, async (_event, input: unknown) => {
       assertPreviewInput(input)
       return codeReviewService.preview(input)

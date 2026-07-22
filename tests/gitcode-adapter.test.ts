@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { CodeHubAdapter } from '../src/features/code-review/main/services/codehub-adapter'
 import { GitCodeAdapter } from '../src/features/code-review/main/services/gitcode-adapter'
+import { readGlobalGitEmail } from '../src/features/code-review/main/services/local-git-identity'
 
 describe('GitCodeAdapter', () => {
   it('parses the singular pull URL used by GitCode pages and plural API-style URLs', () => {
@@ -35,6 +36,39 @@ describe('GitCodeAdapter', () => {
     const locator = adapter.parseUrl(new URL('https://gitcode.com/a/b/pull/1'))
     await expect(adapter.load(locator)).rejects.toMatchObject({ code: 'AUTHENTICATION_FAILED' })
     await expect(adapter.load(locator)).rejects.not.toThrow(/secret rejected/)
+  })
+
+  it('lists the authenticated user open PRs and verifies the local Git email', async () => {
+    const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input)
+      expect(url).not.toContain('top-secret')
+      expect(init?.headers).toMatchObject({ Authorization: 'Bearer top-secret' })
+      if (url.endsWith('/user')) return new Response(JSON.stringify({ login: 'xubin', name: '徐斌', email: 'xubin@example.com' }), { status: 200 })
+      if (url.endsWith('/emails')) return new Response(JSON.stringify([{ email: 'xubin@example.com', state: 'confirmed' }]), { status: 200 })
+      if (url.includes('/user/pulls?')) return new Response(JSON.stringify([{
+        html_url: 'https://gitcode.com/OpenMatrix/MatrixAssistant/pull/2001',
+        title: '优化代码自检', state: 'open', updated_at: '2026-07-22T12:00:00Z',
+        user: { login: 'xubin' }, base: { ref: 'main' }, head: { ref: 'feature/review-list', sha: 'head-2001' }
+      }]), { status: 200 })
+      return new Response(null, { status: 404 })
+    })
+    const adapter = new GitCodeAdapter({ getAccessToken: () => 'top-secret', fetchImpl })
+    const list = await adapter.listMine('XUBIN@example.com')
+
+    expect(list.identity).toMatchObject({ accountLogin: 'xubin', accountName: '徐斌', match: 'matched' })
+    expect(list.mergeRequests).toEqual([expect.objectContaining({
+      sourceId: 'gitcode:OpenMatrix/MatrixAssistant#2001@head-2001',
+      title: '优化代码自检', headBranch: 'feature/review-list', review: { status: 'unreviewed' }
+    })])
+    expect(fetchImpl.mock.calls.some(([input]) => String(input).includes('scope=created_by_me&state=open&sort=updated&direction=desc'))).toBe(true)
+  })
+})
+
+describe('local Git identity', () => {
+  it('normalizes a configured global email and safely handles missing configuration', async () => {
+    await expect(readGlobalGitEmail(async () => ' xubin@example.com\n')).resolves.toBe('xubin@example.com')
+    await expect(readGlobalGitEmail(async () => { throw new Error('missing') })).resolves.toBeNull()
+    await expect(readGlobalGitEmail(async () => 'not-an-email')).resolves.toBeNull()
   })
 })
 

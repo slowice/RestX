@@ -1,6 +1,6 @@
 import { safeStorage } from 'electron'
 import Store from 'electron-store'
-import type { CodeReviewResult } from '../../shared/contracts/code-review'
+import type { CodeReviewResult, MergeRequestReviewState } from '../../shared/contracts/code-review'
 
 const TTL_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -50,6 +50,23 @@ export class CodeReviewCache {
     return result
   }
 
+  getReviewState(sourceId: string): MergeRequestReviewState {
+    if (!sourceId || sourceId.endsWith('@unknown')) return { status: 'unreviewed' }
+    const separator = sourceId.lastIndexOf('@')
+    if (separator < 0) return { status: 'unreviewed' }
+    const sourcePrefix = sourceId.slice(0, separator + 1)
+    const related = this.activeResults()
+      .filter((result) => result.sourceId.startsWith(sourcePrefix))
+      .sort((a, b) => Date.parse(b.analyzedAt) - Date.parse(a.analyzedAt))
+    const current = related.find((result) => result.sourceId === sourceId)
+    if (current) return {
+      status: current.findings.length ? 'issues' : 'passed',
+      findingCount: current.findings.length,
+      analyzedAt: current.analyzedAt
+    }
+    return related[0] ? { status: 'stale', analyzedAt: related[0].analyzedAt } : { status: 'unreviewed' }
+  }
+
   clear(): number {
     const count = Math.max(this.memory.size, Object.keys(this.records()).length)
     this.memory.clear()
@@ -61,6 +78,33 @@ export class CodeReviewCache {
     const value = this.storage.get('records')
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
     return value as Record<string, StoredRecord>
+  }
+
+  private activeResults(): CodeReviewResult[] {
+    const now = this.now().getTime()
+    const results = new Map<string, CodeReviewResult>()
+    for (const [fingerprint, result] of this.memory) {
+      if (Date.parse(result.expiresAt) <= now) this.memory.delete(fingerprint)
+      else results.set(`${result.reviewId}:${result.analyzedAt}`, result)
+    }
+    if (!this.crypto.isAvailable()) return [...results.values()]
+    const records = this.records()
+    let changed = false
+    for (const [fingerprint, record] of Object.entries(records)) {
+      if (Date.parse(record.expiresAt) <= now) {
+        delete records[fingerprint]
+        changed = true
+        continue
+      }
+      try {
+        const result = JSON.parse(this.crypto.decrypt(record.encrypted)) as CodeReviewResult
+        if (result && typeof result.sourceId === 'string' && Array.isArray(result.findings)) results.set(`${result.reviewId}:${result.analyzedAt}`, result)
+      } catch {
+        // Ignore unreadable cache entries without exposing their contents.
+      }
+    }
+    if (changed) this.storage.set('records', records)
+    return [...results.values()]
   }
 }
 

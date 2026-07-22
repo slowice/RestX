@@ -82,4 +82,19 @@ describe('review cache and zone enforcement', () => {
     await expect(service.preview({ url: 'https://gitcode.com/OpenMatrix/MatrixAssistant/pull/1958', zone: 'yellow' })).rejects.toMatchObject({ code: 'ZONE_MISMATCH' })
     expect(fetchImpl).not.toHaveBeenCalled()
   })
+
+  it('marks the current head as passed or problematic and older heads as stale', () => {
+    const cache = new CodeReviewCache(new MemoryStorage(), crypto)
+    cache.set('passed', { ...result, sourceId: 'gitcode:team/repo#7@sha-1', analyzedAt: '2026-07-22T01:00:00.000Z' })
+    expect(cache.getReviewState('gitcode:team/repo#7@sha-1')).toMatchObject({ status: 'passed', findingCount: 0 })
+    expect(cache.getReviewState('gitcode:team/repo#7@sha-2')).toMatchObject({ status: 'stale' })
+
+    cache.set('issues', {
+      ...result,
+      sourceId: 'gitcode:team/repo#7@sha-2',
+      analyzedAt: '2026-07-22T02:00:00.000Z',
+      findings: [{ id: 'finding', severity: 'P1', category: 'bug', title: '空值风险', explanation: '可能为空。', evidence: 'value.call()', filePath: 'src/demo.ts', startLine: 1, ruleId: 'BUG-1', confidence: 'high' }]
+    })
+    expect(cache.getReviewState('gitcode:team/repo#7@sha-2')).toMatchObject({ status: 'issues', findingCount: 1 })
+  })
 })

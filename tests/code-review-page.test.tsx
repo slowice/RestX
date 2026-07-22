@@ -27,7 +27,10 @@ function makeApi(): RestXApi {
     ai: { getRuntimeStatus: vi.fn(), getProviderSettings: vi.fn(), updateProviderSettings: vi.fn(), analyzeConfig: vi.fn(), getCachedAnalysis: vi.fn(), clearAnalysisCache: vi.fn() },
     presets: { list: vi.fn(), generateDraft: vi.fn(), save: vi.fn(), setEnabled: vi.fn(), delete: vi.fn() },
     codeReview: {
-      previewSource: vi.fn(async () => preview), run: vi.fn(async () => result), getGitCodeSettings: vi.fn(), updateGitCodeSettings: vi.fn(), testGitCodeConnection: vi.fn(), getZoneProviders: vi.fn(), updateZoneProvider: vi.fn(), clearCache: vi.fn()
+      listMyGitCodeMergeRequests: vi.fn(async () => ({
+        identity: { localGitEmail: 'xubin@example.com', accountLogin: 'xubin', accountName: '徐斌', match: 'matched' as const },
+        mergeRequests: [], fetchedAt: '2026-07-22T00:00:00.000Z'
+      })), previewSource: vi.fn(async () => preview), run: vi.fn(async () => result), getGitCodeSettings: vi.fn(), updateGitCodeSettings: vi.fn(), testGitCodeConnection: vi.fn(), getZoneProviders: vi.fn(), updateZoneProvider: vi.fn(), clearCache: vi.fn()
     }
   }
 }
@@ -59,5 +62,36 @@ describe('CodeReviewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /黄区 · 代码保密区/ }))
     expect(screen.getByText('CodeHub Merge Request')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('进入黄区后配置 CodeHub 域名')).toBeDisabled()
+  })
+
+  it('selects an open MR without paste and marks a clean result as passed', async () => {
+    const api = makeApi()
+    const listed = {
+      sourceId: preview.sourceId,
+      locator: preview.locator,
+      title: preview.title,
+      state: 'open',
+      author: 'xubin',
+      baseBranch: preview.baseBranch,
+      headBranch: preview.headBranch,
+      headSha: preview.headSha,
+      updatedAt: '2026-07-22T00:00:00.000Z',
+      draft: false,
+      review: { status: 'unreviewed' as const }
+    }
+    vi.mocked(api.codeReview.listMyGitCodeMergeRequests).mockResolvedValue({
+      identity: { localGitEmail: 'xubin@example.com', accountLogin: 'xubin', accountName: '徐斌', match: 'matched' },
+      mergeRequests: [listed], fetchedAt: '2026-07-22T00:00:00.000Z'
+    })
+    vi.mocked(api.codeReview.run).mockResolvedValue({ ...result, sourceId: preview.sourceId, findings: [], summary: '未发现明确问题。' })
+    Object.defineProperty(window, 'restx', { configurable: true, value: api })
+    render(<MemoryRouter><CodeReviewPage /></MemoryRouter>)
+
+    const choice = await screen.findByRole('button', { name: /OpenMatrix\/MatrixAssistant #1958/ })
+    fireEvent.click(choice)
+    await waitFor(() => expect(api.codeReview.previewSource).toHaveBeenCalledWith({ url: preview.locator.webUrl, zone: 'blue' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '开始 AI 检视' })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: '开始 AI 检视' }))
+    await waitFor(() => expect(screen.getByText('检视通过')).toBeInTheDocument())
   })
 })

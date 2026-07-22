@@ -99,6 +99,42 @@ export type GitCodeConnectionStatus = {
   message: string
 }
 
+export type GitCodeIdentityMatch = 'matched' | 'mismatched' | 'local-email-unavailable' | 'remote-email-unavailable'
+export type MergeRequestReviewStatus = 'unreviewed' | 'passed' | 'issues' | 'stale'
+
+export type GitCodeIdentity = {
+  localGitEmail: string | null
+  accountLogin: string
+  accountName: string
+  match: GitCodeIdentityMatch
+}
+
+export type MergeRequestReviewState = {
+  status: MergeRequestReviewStatus
+  findingCount?: number
+  analyzedAt?: string
+}
+
+export type GitCodeMergeRequestSummary = {
+  sourceId: string
+  locator: MergeRequestLocator
+  title: string
+  state: string
+  author: string | null
+  baseBranch: string
+  headBranch: string
+  headSha: string
+  updatedAt: string | null
+  draft: boolean
+  review: MergeRequestReviewState
+}
+
+export type GitCodeMergeRequestList = {
+  identity: GitCodeIdentity
+  mergeRequests: GitCodeMergeRequestSummary[]
+  fetchedAt: string
+}
+
 export type ReviewProviderPublicSettings = {
   provider: 'openai-compatible'
   baseUrl: string

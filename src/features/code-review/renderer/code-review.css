@@ -236,3 +236,80 @@
 .code-review-page .no-findings strong { color: #3d4844; }
 .code-review-page .no-findings span { color: #74817c; }
 .code-review-page .result-footer { color: #6f7c77; border-color: #e1e7e4; background: #f7f9f8; }
+
+.code-review-page .my-merge-requests {
+  overflow: hidden;
+  border: 1px solid #dce4e1;
+  border-radius: 10px;
+  background: #fbfdfc;
+}
+.code-review-page .my-merge-requests > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 10px;
+  border-bottom: 1px solid #e2e8e5;
+  background: #f5f9f7;
+}
+.code-review-page .my-merge-requests > header > div { display: flex; flex-direction: column; gap: 2px; }
+.code-review-page .my-merge-requests > header strong { color: #394640; font-size: 12px; }
+.code-review-page .my-merge-requests > header small { color: #7b8983; font-size: 10px; }
+.code-review-page .my-merge-requests .icon-button { width: 28px; height: 28px; color: #66756f; border-color: #d9e2de; background: #fff; }
+.code-review-page .mr-list-message,
+.code-review-page .mr-list-error,
+.code-review-page .mr-list-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 58px;
+  padding: 10px;
+  color: #718079;
+  font-size: 11px;
+}
+.code-review-page .mr-list-error { align-items: flex-start; color: #9a5e25; background: #fffaf1; }
+.code-review-page .mr-list-error > span { flex: 1; line-height: 1.45; }
+.code-review-page .mr-list-error a { flex: none; color: #087d62; font-weight: 700; text-decoration: none; }
+.code-review-page .git-identity {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  color: #0c8967;
+  border-bottom: 1px solid #e7ecea;
+  background: #f1faf7;
+}
+.code-review-page .git-identity.mismatched { color: #a16720; background: #fff9eb; }
+.code-review-page .git-identity.local-email-unavailable,
+.code-review-page .git-identity.remote-email-unavailable { color: #60746d; background: #f6f8f7; }
+.code-review-page .git-identity > span { display: flex; min-width: 0; flex-direction: column; gap: 1px; }
+.code-review-page .git-identity b { overflow: hidden; color: #3b4943; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.code-review-page .git-identity small { overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.code-review-page .mr-choice-list { max-height: 268px; overflow-y: auto; }
+.code-review-page .mr-choice {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  color: inherit;
+  border: 0;
+  border-bottom: 1px solid #e9eeeb;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+.code-review-page .mr-choice:last-child { border-bottom: 0; }
+.code-review-page .mr-choice:hover { background: #f7fbf9; }
+.code-review-page .mr-choice.selected { background: #edf8f4; box-shadow: inset 3px 0 #10a37f; }
+.code-review-page .mr-choice-main { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.code-review-page .mr-choice-main b { color: #247d68; font-size: 9px; font-weight: 700; }
+.code-review-page .mr-choice-main strong { overflow: hidden; color: #34413b; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.code-review-page .mr-choice-main small { overflow: hidden; color: #7b8983; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.code-review-page .mr-review-state { display: inline-flex; flex: none; align-items: center; gap: 3px; padding: 3px 5px; color: #78847f; border-radius: 999px; background: #f0f3f2; font-size: 9px; white-space: nowrap; }
+.code-review-page .mr-review-state.passed { color: #087d62; background: #dff4ec; }
+.code-review-page .mr-review-state.issues { color: #b14c58; background: #fbe8eb; }
+.code-review-page .mr-review-state.stale { color: #9a6b20; background: #fff1cc; }
+.code-review-page .mr-list-empty > span { display: flex; flex-direction: column; gap: 3px; }
+.code-review-page .mr-list-empty b { color: #46534d; font-size: 11px; }
+.code-review-page .mr-list-empty small { color: #7b8983; font-size: 10px; }
