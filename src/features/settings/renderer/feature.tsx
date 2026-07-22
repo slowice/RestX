@@ -10,5 +10,5 @@ export const settingsFeature = defineRendererFeature({
     load: () => import('./SettingsPage').then(({ SettingsPage }) => ({ default: SettingsPage }))
   },
   status: 'stable',
-  requires: ['ai-inspector.renderer']
+  requires: ['ai-inspector.renderer', 'code-review.renderer']
 })
