@@ -46,15 +46,15 @@ function terminalWildcardPattern(value: string): RegExp {
 
 type WildcardTrustBoundary = {
   path: string
-  skipFirstFixedParent: boolean
+  allowsMacTmpAlias: boolean
 }
 
 function trustedTemplateBase(template: string, resolvedTemplate: string, environment: PresetPathEnvironment): WildcardTrustBoundary {
   const variable = template.match(/^\$\{(HOME|TEMP|UID)\}(?:[\\/]|$)/)?.[1]
-  if (variable === 'HOME') return { path: path.resolve(environment.homeDirectory), skipFirstFixedParent: false }
-  if (variable === 'TEMP') return { path: path.resolve(environment.tempDirectory), skipFirstFixedParent: false }
-  if (variable === 'UID' && environment.uid) return { path: path.resolve(environment.uid), skipFirstFixedParent: false }
-  return { path: path.parse(resolvedTemplate).root, skipFirstFixedParent: true }
+  if (variable === 'HOME') return { path: path.resolve(environment.homeDirectory), allowsMacTmpAlias: false }
+  if (variable === 'TEMP') return { path: path.resolve(environment.tempDirectory), allowsMacTmpAlias: false }
+  if (variable === 'UID' && environment.uid) return { path: path.resolve(environment.uid), allowsMacTmpAlias: false }
+  return { path: path.parse(resolvedTemplate).root, allowsMacTmpAlias: environment.platform === 'darwin' }
 }
 
 async function hasSafeWildcardParent(parentPath: string, boundary: WildcardTrustBoundary): Promise<boolean> {
@@ -67,7 +67,7 @@ async function hasSafeWildcardParent(parentPath: string, boundary: WildcardTrust
   try {
     for (const [index, segment] of relativeParent.split(path.sep).entries()) {
       currentPath = path.join(currentPath, segment)
-      if (boundary.skipFirstFixedParent && index === 0) continue
+      if (boundary.allowsMacTmpAlias && index === 0 && currentPath === path.join(trustedBase, 'tmp')) continue
       if ((await lstat(currentPath)).isSymbolicLink()) return false
     }
     return true

@@ -114,6 +114,14 @@ describe('preset path resolver', () => {
     })).resolves.toEqual([await realpath(path.join(temp, 'openclaw-log'))])
   })
 
+  it.skipIf(process.platform !== 'darwin')('rejects other literal first-component symbolic links', async () => {
+    const root = await makeFixture()
+
+    await expect(resolvePresetPaths(root, { path: '/etc/host*' }, {
+      homeDirectory: root, tempDirectory: root, platform: 'darwin'
+    })).resolves.toEqual([])
+  })
+
   it('keeps exact relative paths inside the supplied root', async () => {
     const root = await makeFixture()
     await mkdir(path.join(root, '.openclaw'))
