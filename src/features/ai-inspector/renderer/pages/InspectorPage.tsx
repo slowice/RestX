@@ -155,7 +155,7 @@ export function InspectorPage(): React.JSX.Element {
 
   return (
     <div className="page inspector-page">
-      <PageHeader eyebrow="LOCAL INSPECTION" title="AI Inspector" description="识别本机 AI 工具，并按工具与文件夹浏览相关配置和日志。" actions={<>
+      <PageHeader eyebrow="LOCAL INSPECTION" title="工具扫描" description="识别本机 AI 工具，并按工具与文件夹浏览相关配置和日志。" actions={<>
         <button className="button secondary" type="button" onClick={() => setShowSmartImport(true)}><Sparkles size={16} />智能导入</button>
         <button className="button primary" type="button" onClick={() => void chooseAndScan()} disabled={status === 'scanning'}><FolderOpen size={17} />选择用户目录</button>
       </>} />

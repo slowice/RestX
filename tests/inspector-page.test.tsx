@@ -94,6 +94,8 @@ describe('Inspector tool folder browser', () => {
     Object.defineProperty(window, 'restx', { configurable: true, value: api })
     render(<MemoryRouter><InspectorStateProvider><InspectorPage /></InspectorStateProvider></MemoryRouter>)
 
+    expect(screen.getByRole('heading', { name: '工具扫描' })).toBeInTheDocument()
+
     fireEvent.click(screen.getAllByRole('button', { name: /选择用户目录/ })[0])
 
     await waitFor(() => expect(screen.getByText('1 / 3 已检测到')).toBeInTheDocument())
