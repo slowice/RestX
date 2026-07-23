@@ -134,27 +134,3 @@ export type GitCodeMergeRequestList = {
   mergeRequests: GitCodeMergeRequestSummary[]
   fetchedAt: string
 }
-
-export type ReviewProviderPublicSettings = {
-  provider: 'openai-compatible'
-  baseUrl: string
-  model: string
-  apiKeyConfigured: boolean
-}
-
-export type ReviewProviderSettingsInput = {
-  baseUrl: string
-  model: string
-  apiKey?: string
-  clearApiKey?: boolean
-}
-
-export type ZoneProviderSettings = {
-  blue: ReviewProviderPublicSettings
-  yellow: ReviewProviderPublicSettings
-}
-
-export type UpdateZoneProviderInput = {
-  zone: ReviewZone
-  settings: ReviewProviderSettingsInput
-}

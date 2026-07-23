@@ -24,13 +24,14 @@ function makeApi(): RestXApi {
   return {
     inspector: { chooseDirectory: vi.fn(), scanDirectory: vi.fn(), readConfig: vi.fn(), readJsonlPage: vi.fn(), readJsonlEntry: vi.fn(), searchJsonlWorkspace: vi.fn(), revealInFolder: vi.fn() },
     app: { getVersion: vi.fn(), getPreferences: vi.fn(), setAiLocalAnalysisEnabled: vi.fn(), clearHistory: vi.fn() },
-    ai: { getRuntimeStatus: vi.fn(), getProviderSettings: vi.fn(), updateProviderSettings: vi.fn(), analyzeConfig: vi.fn(), getCachedAnalysis: vi.fn(), clearAnalysisCache: vi.fn() },
+    providers: { getState: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(), setActive: vi.fn(), test: vi.fn(), refreshExternal: vi.fn() },
+    ai: { analyzeConfig: vi.fn(), getCachedAnalysis: vi.fn(), clearAnalysisCache: vi.fn() },
     presets: { list: vi.fn(), generateDraft: vi.fn(), save: vi.fn(), setEnabled: vi.fn(), delete: vi.fn() },
     codeReview: {
       listMyGitCodeMergeRequests: vi.fn(async () => ({
         identity: { localGitEmail: 'xubin@example.com', accountLogin: 'xubin', accountName: '徐斌', match: 'matched' as const },
         mergeRequests: [], fetchedAt: '2026-07-22T00:00:00.000Z'
-      })), previewSource: vi.fn(async () => preview), run: vi.fn(async () => result), getGitCodeSettings: vi.fn(), updateGitCodeSettings: vi.fn(), testGitCodeConnection: vi.fn(), getZoneProviders: vi.fn(), updateZoneProvider: vi.fn(), clearCache: vi.fn()
+      })), previewSource: vi.fn(async () => preview), run: vi.fn(async () => result), getGitCodeSettings: vi.fn(), updateGitCodeSettings: vi.fn(), testGitCodeConnection: vi.fn(), clearCache: vi.fn()
     }
   }
 }

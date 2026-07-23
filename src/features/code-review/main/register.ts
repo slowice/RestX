@@ -1,17 +1,14 @@
 import type {
   GitCodeSettingsInput,
   PreviewReviewSourceInput,
-  ReviewProviderSettingsInput,
   ReviewZone,
-  RunCodeReviewInput,
-  UpdateZoneProviderInput
+  RunCodeReviewInput
 } from '../shared/contracts/code-review'
 import { codeReviewChannels as channels } from '../shared/channels'
 import { defineMainFeature } from '../../../platform/main/define-feature'
 import { getCodeReviewCache } from './services/code-review-cache'
 import { codeReviewService } from './services/code-review-service'
 import { gitCodeSettings } from './services/gitcode-settings'
-import { reviewZoneSettings } from './services/review-zone-settings'
 
 function assertString(value: unknown, name: string): asserts value is string {
   if (typeof value !== 'string' || value.length === 0 || value.length > 32_768) throw new Error(`${name} 参数无效。`)
@@ -43,22 +40,6 @@ function assertGitCodeSettings(value: unknown): asserts value is GitCodeSettings
   if (input.clearAccessToken !== undefined && typeof input.clearAccessToken !== 'boolean') throw new Error('clearAccessToken 参数无效。')
 }
 
-function assertProviderSettings(value: unknown): asserts value is ReviewProviderSettingsInput {
-  if (!value || typeof value !== 'object') throw new Error('区域 AI 配置无效。')
-  const input = value as Record<string, unknown>
-  assertString(input.baseUrl, 'baseUrl')
-  assertString(input.model, 'model')
-  if (input.apiKey !== undefined && typeof input.apiKey !== 'string') throw new Error('apiKey 参数无效。')
-  if (input.clearApiKey !== undefined && typeof input.clearApiKey !== 'boolean') throw new Error('clearApiKey 参数无效。')
-}
-
-function assertZoneProviderInput(value: unknown): asserts value is UpdateZoneProviderInput {
-  if (!value || typeof value !== 'object') throw new Error('区域 AI 配置无效。')
-  const input = value as Record<string, unknown>
-  assertZone(input.zone)
-  assertProviderSettings(input.settings)
-}
-
 export const codeReviewMainFeature = defineMainFeature({
   id: 'code-review',
   provides: ['code-review.main'],
@@ -79,11 +60,6 @@ export const codeReviewMainFeature = defineMainFeature({
       return gitCodeSettings.update(input)
     })
     ipc.handle(channels.testGitCodeConnection, () => codeReviewService.testGitCodeConnection())
-    ipc.handle(channels.getZoneProviders, () => reviewZoneSettings.getAll())
-    ipc.handle(channels.updateZoneProvider, (_event, input: unknown) => {
-      assertZoneProviderInput(input)
-      return reviewZoneSettings.update(input.zone, input.settings)
-    })
     ipc.handle(channels.clearCache, () => ({ cleared: getCodeReviewCache().clear() }))
   }
 })

@@ -16,6 +16,8 @@
     "src/platform/shared/**/*.ts",
     "src/platform/main/**/*.ts",
     "src/platform/preload/**/*.ts",
+    "src/platform/ai-provider/shared/**/*.ts",
+    "src/platform/ai-provider/main/**/*.ts",
     "src/features/*/shared/**/*.ts",
     "src/features/*/main/**/*.ts",
     "src/features/*/preload/**/*.ts",

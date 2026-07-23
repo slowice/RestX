@@ -29,21 +29,26 @@ function makeDocument(sourceHash = 'a'.repeat(64)): ConfigDocument {
 function makeHarness(overrides: { consent?: boolean; sourceHash?: string; model?: string } = {}) {
   let document = makeDocument(overrides.sourceHash)
   let model = overrides.model ?? 'demo-model'
-  const provider = vi.fn(async () => result)
+  let providerId = 'demo-provider'
+  const provider = vi.fn(async () => ({ result, modelId: model }))
   const cache = new AnalysisCache(new MemoryCacheStorage())
   const service = new ConfigAnalysisService({
     cache,
     readDocument: async () => document,
-    getProviderPublic: () => ({ provider: 'openai-compatible', baseUrl: 'https://example.com/v1', model, apiKeyConfigured: true }),
-    getProviderSecret: () => ({ baseUrl: 'https://example.com/v1', model, apiKey: 'secret' }),
+    getProviderPublic: () => ({ id: providerId, name: 'Demo', source: 'manual', baseUrl: 'https://example.com/v1', modelId: model, apiKeyConfigured: true, status: 'ready', active: true, editable: true, identityFingerprint: `${providerId}:${model}` }),
     isConsentEnabled: () => overrides.consent ?? true,
-    analyzeProvider: provider,
+    analyzeProvider: async (document, providerId) => {
+      void document
+      void providerId
+      return provider()
+    },
     now: () => new Date('2026-07-21T01:00:00.000Z')
   })
   return {
     service, cache, provider,
     updateDocument: (sourceHash: string) => { document = makeDocument(sourceHash) },
-    updateModel: (next: string) => { model = next }
+    updateModel: (next: string) => { model = next },
+    updateProvider: (next: string) => { providerId = next }
   }
 }
 
@@ -68,6 +73,14 @@ describe('ConfigAnalysisService cache behavior', () => {
     const harness = makeHarness()
     await harness.service.analyze('/authorized/config.json')
     harness.updateModel('another-model')
+    expect((await harness.service.analyze('/authorized/config.json')).cacheStatus).toBe('miss')
+    expect(harness.provider).toHaveBeenCalledTimes(2)
+  })
+
+  it('invalidates when the selected Provider changes even if the model ID is unchanged', async () => {
+    const harness = makeHarness()
+    await harness.service.analyze('/authorized/config.json')
+    harness.updateProvider('another-provider')
     expect((await harness.service.analyze('/authorized/config.json')).cacheStatus).toBe('miss')
     expect(harness.provider).toHaveBeenCalledTimes(2)
   })

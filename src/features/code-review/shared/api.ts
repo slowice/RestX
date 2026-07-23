@@ -6,9 +6,7 @@ import type {
   GitCodeSettingsInput,
   PreviewReviewSourceInput,
   ReviewSourcePreview,
-  RunCodeReviewInput,
-  UpdateZoneProviderInput,
-  ZoneProviderSettings
+  RunCodeReviewInput
 } from './contracts/code-review'
 
 export type CodeReviewApi = {
@@ -19,8 +17,6 @@ export type CodeReviewApi = {
     getGitCodeSettings(): Promise<GitCodePublicSettings>
     updateGitCodeSettings(input: GitCodeSettingsInput): Promise<GitCodePublicSettings>
     testGitCodeConnection(): Promise<GitCodeConnectionStatus>
-    getZoneProviders(): Promise<ZoneProviderSettings>
-    updateZoneProvider(input: UpdateZoneProviderInput): Promise<ZoneProviderSettings>
     clearCache(): Promise<{ cleared: number }>
   }
 }

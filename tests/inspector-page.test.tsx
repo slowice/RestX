@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { RestXApi } from '../src/app-api'
-import type { AiProviderPublicSettings, CachedAnalysisResponse, RuntimeStatus } from '../src/features/ai-inspector/shared/contracts/ai-capability'
+import type { CachedAnalysisResponse } from '../src/features/ai-inspector/shared/contracts/ai-capability'
 import type { ConfigDocument } from '../src/features/ai-inspector/shared/contracts/config'
 import type { ScanCandidate, ScanResult } from '../src/features/ai-inspector/shared/contracts/inspector'
 import type { JsonlEntryDetail, JsonlPage, JsonlPageRequest, JsonlWorkspaceSearchResult } from '../src/features/ai-inspector/shared/contracts/jsonl'
@@ -76,13 +76,12 @@ function makeApi(): RestXApi {
       getPreferences: vi.fn(async () => ({ recentDirectory: '/Users/demo', aiLocalAnalysisEnabled: false })),
       setAiLocalAnalysisEnabled: vi.fn(), clearHistory: vi.fn()
     },
+    providers: { getState: vi.fn(async () => ({ providers: [], activeProviderId: null })), create: vi.fn(), update: vi.fn(), delete: vi.fn(), setActive: vi.fn(), test: vi.fn(), refreshExternal: vi.fn() },
     ai: {
-      getRuntimeStatus: vi.fn(async (): Promise<RuntimeStatus> => 'ready'),
-      getProviderSettings: vi.fn(async (): Promise<AiProviderPublicSettings> => ({ provider: 'openai-compatible', baseUrl: '', model: '', apiKeyConfigured: false })),
-      updateProviderSettings: vi.fn(), analyzeConfig: vi.fn(), getCachedAnalysis: vi.fn(async (): Promise<CachedAnalysisResponse> => ({ status: 'none', record: null })), clearAnalysisCache: vi.fn()
+      analyzeConfig: vi.fn(), getCachedAnalysis: vi.fn(async (): Promise<CachedAnalysisResponse> => ({ status: 'none', record: null })), clearAnalysisCache: vi.fn()
     },
     presets: { list: vi.fn(async () => []), generateDraft: vi.fn(), save: vi.fn(), setEnabled: vi.fn(), delete: vi.fn() },
-    codeReview: { listMyGitCodeMergeRequests: vi.fn(), previewSource: vi.fn(), run: vi.fn(), getGitCodeSettings: vi.fn(), updateGitCodeSettings: vi.fn(), testGitCodeConnection: vi.fn(), getZoneProviders: vi.fn(), updateZoneProvider: vi.fn(), clearCache: vi.fn() }
+    codeReview: { listMyGitCodeMergeRequests: vi.fn(), previewSource: vi.fn(), run: vi.fn(), getGitCodeSettings: vi.fn(), updateGitCodeSettings: vi.fn(), testGitCodeConnection: vi.fn(), clearCache: vi.fn() }
   }
 }
 

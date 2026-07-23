@@ -1,4 +1,4 @@
-import type { AiAnalysisResponse, AiProviderPublicSettings, AiProviderSettingsInput, AnalyzeConfigInput, CachedAnalysisResponse, RuntimeStatus } from './contracts/ai-capability'
+import type { AiAnalysisResponse, AnalyzeConfigInput, CachedAnalysisResponse } from './contracts/ai-capability'
 import type { ConfigDocument } from './contracts/config'
 import type { ScanResult } from './contracts/inspector'
 import type { JsonlEntryDetail, JsonlEntryRequest, JsonlPage, JsonlPageRequest, JsonlWorkspaceSearchRequest, JsonlWorkspaceSearchResult } from './contracts/jsonl'
@@ -25,9 +25,6 @@ export type AiInspectorApi = {
     clearHistory(): Promise<AppPreferences>
   }
   ai: {
-    getRuntimeStatus(): Promise<RuntimeStatus>
-    getProviderSettings(): Promise<AiProviderPublicSettings>
-    updateProviderSettings(input: AiProviderSettingsInput): Promise<AiProviderPublicSettings>
     analyzeConfig(input: AnalyzeConfigInput): Promise<AiAnalysisResponse>
     getCachedAnalysis(path: string): Promise<CachedAnalysisResponse>
     clearAnalysisCache(): Promise<{ cleared: number }>

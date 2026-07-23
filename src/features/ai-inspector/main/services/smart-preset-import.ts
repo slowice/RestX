@@ -3,12 +3,12 @@ import path from 'node:path'
 import type { AiToolPreset } from '../../shared/contracts/ai-tool-preset'
 import type { SmartPresetDraft, SmartPresetDraftRequest } from '../../shared/contracts/smart-import'
 import { AI_TOOL_PRESETS } from '../presets/ai-tools'
+import { aiProviderRegistry } from '../../../../platform/ai-provider/main/provider-registry'
 import { parseAiToolPreset, validateAiToolPresets } from '../presets/ai-tools/validator'
 import { aiCallLogger, formatLogTimestamp, type AiCallLogger } from './ai-call-logger'
 import { discoverAiTools } from './ai-tool-discovery'
 import { normalizeBaseUrl, ProviderError, type ProviderSecretSettings } from './openai-provider'
 import { collectPresetInventory } from './preset-inventory'
-import { providerSettings } from './provider-settings'
 
 export const SMART_PRESET_PROMPT_VERSION = 'smart-preset-import-v1'
 const MAX_INPUT_CHARACTERS = 120_000
@@ -143,10 +143,12 @@ export async function generateSmartPresetDraft(
     userPayload = JSON.stringify(payload)
   }
   if (userPayload.length > MAX_INPUT_CHARACTERS) throw new ProviderError('导入线索过大，请精简备注后重试。', 'INPUT_TOO_LARGE')
-  const content = await requestDraft({
-    settings: dependencies.settings ?? providerSettings.getSecret(), userPayload,
-    fetchImpl: dependencies.fetchImpl, logger: dependencies.logger
+  const request = (settings: ProviderSecretSettings) => requestDraft({
+    settings, userPayload, fetchImpl: dependencies.fetchImpl, logger: dependencies.logger
   })
+  const content = dependencies.settings
+    ? await request(dependencies.settings)
+    : await aiProviderRegistry.executeActive((provider) => request({ baseUrl: provider.baseUrl, model: provider.modelId, apiKey: provider.apiKey }))
   const parsed = parseModelDraft(content)
   const trialResult = await discoverAiTools(input.rootPath, { maxFiles: 10_000, maxFileSizeBytes: 20 * 1024 * 1024 }, [parsed.preset])
   const tool = trialResult.tools[0]

@@ -1,19 +1,3 @@
-export type RuntimeStatus = 'stopped' | 'starting' | 'ready' | 'error'
-
-export type AiProviderPublicSettings = {
-  provider: 'openai-compatible'
-  baseUrl: string
-  model: string
-  apiKeyConfigured: boolean
-}
-
-export type AiProviderSettingsInput = {
-  baseUrl: string
-  model: string
-  apiKey?: string
-  clearApiKey?: boolean
-}
-
 export type AiAnalysisRisk = {
   severity: 'info' | 'warning' | 'critical'
   title: string

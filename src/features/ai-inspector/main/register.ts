@@ -1,19 +1,18 @@
 import { dialog, shell } from 'electron'
 import path from 'node:path'
-import type { AnalyzeConfigInput, AiProviderSettingsInput } from '../shared/contracts/ai-capability'
+import type { AnalyzeConfigInput } from '../shared/contracts/ai-capability'
 import type { JsonlEntryRequest, JsonlPageRequest, JsonlWorkspaceSearchRequest } from '../shared/contracts/jsonl'
 import type { SaveUserPresetInput, SmartPresetDraftRequest } from '../shared/contracts/smart-import'
 import { aiInspectorChannels } from '../shared/channels'
 import { defineMainFeature } from '../../../platform/main/define-feature'
+import { aiProviderRegistry } from '../../../platform/ai-provider/main/provider-registry'
 import { authorizedPaths } from './services/authorized-paths'
 import { aiCallLogger, ensureAiLogDirectory } from './services/ai-call-logger'
 import { getPersistentAnalysisCache } from './services/analysis-cache'
 import { ConfigAnalysisService } from './services/config-analysis-service'
 import { readConfigDocument } from './services/config-reader'
-import { openClawRuntime } from './services/openclaw-runtime'
 import { analyzeWithOpenAiCompatible } from './services/openai-provider'
 import { preferences } from './services/preferences'
-import { providerSettings } from './services/provider-settings'
 import { scanDirectory } from './services/file-scanner'
 import { readJsonlEntry, readJsonlPage, searchJsonlWorkspace } from './services/jsonl-browser'
 import { generateSmartPresetDraft } from './services/smart-preset-import'
@@ -23,15 +22,6 @@ function assertString(value: unknown, name: string): asserts value is string {
   if (typeof value !== 'string' || value.length === 0 || value.length > 32_768) {
     throw new Error(`${name} 参数无效。`)
   }
-}
-
-function assertProviderInput(value: unknown): asserts value is AiProviderSettingsInput {
-  if (!value || typeof value !== 'object') throw new Error('AI 服务配置无效。')
-  const input = value as Record<string, unknown>
-  assertString(input.baseUrl, 'baseUrl')
-  assertString(input.model, 'model')
-  if (input.apiKey !== undefined && typeof input.apiKey !== 'string') throw new Error('apiKey 参数无效。')
-  if (input.clearApiKey !== undefined && typeof input.clearApiKey !== 'boolean') throw new Error('clearApiKey 参数无效。')
 }
 
 function assertJsonlPageRequest(value: unknown): asserts value is JsonlPageRequest {
@@ -84,10 +74,19 @@ function assertPresetId(value: unknown): asserts value is string {
 const analysisService = new ConfigAnalysisService({
   cache: getPersistentAnalysisCache(),
   readDocument: readConfigDocument,
-  getProviderPublic: () => providerSettings.getPublic(),
-  getProviderSecret: () => providerSettings.getSecret(),
+  getProviderPublic: async () => {
+    const state = await aiProviderRegistry.getState()
+    return state.providers.find((provider) => provider.id === state.activeProviderId) ?? null
+  },
   isConsentEnabled: () => preferences.get().aiLocalAnalysisEnabled,
-  analyzeProvider: (settings, document) => analyzeWithOpenAiCompatible({ settings, document, logger: aiCallLogger })
+  analyzeProvider: (document, providerId) => aiProviderRegistry.execute(providerId, async (provider) => ({
+    result: await analyzeWithOpenAiCompatible({
+      settings: { baseUrl: provider.baseUrl, model: provider.modelId, apiKey: provider.apiKey },
+      document,
+      logger: aiCallLogger
+    }),
+    modelId: provider.modelId
+  }))
 })
 
 export const aiInspectorMainFeature = defineMainFeature({
@@ -154,12 +153,6 @@ export const aiInspectorMainFeature = defineMainFeature({
   ipc.handle(aiInspectorChannels.clearHistory, () => {
     authorizedPaths.clear()
     return preferences.clearHistory()
-  })
-  ipc.handle(aiInspectorChannels.getRuntimeStatus, () => openClawRuntime.getStatus())
-  ipc.handle(aiInspectorChannels.getProviderSettings, () => providerSettings.getPublic())
-  ipc.handle(aiInspectorChannels.updateProviderSettings, (_event, input: unknown) => {
-    assertProviderInput(input)
-    return providerSettings.update(input)
   })
   ipc.handle(aiInspectorChannels.analyzeConfig, async (_event, input: unknown) => {
     if (!input || typeof input !== 'object') throw new Error('分析请求无效。')

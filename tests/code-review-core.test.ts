@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { ResolvedAiProvider } from '../src/platform/ai-provider/shared/contracts'
 import type { CodeReviewResult } from '../src/features/code-review/shared/contracts/code-review'
 import { CodeReviewCache, type ReviewCacheCrypto, type ReviewCacheStorage } from '../src/features/code-review/main/services/code-review-cache'
 import { parseCodeReviewResponse } from '../src/features/code-review/main/services/code-review-provider'
@@ -23,6 +24,8 @@ const result: Omit<CodeReviewResult, 'expiresAt'> = {
   reviewId: 'review-1', sourceId: 'source', summary: '完成', findings: [], reviewedFiles: 1, excludedFiles: 0,
   model: 'demo', rules: [{ id: 'security', name: '安全', version: '1.0.0' }], analyzedAt: '2026-07-22T00:00:00.000Z', cacheStatus: 'miss'
 }
+
+afterEach(() => vi.unstubAllGlobals())
 
 describe('review rule packs', () => {
   it('parses Skill-style Markdown with validated frontmatter', () => {
@@ -81,6 +84,31 @@ describe('review cache and zone enforcement', () => {
     const service = new CodeReviewService(cache, adapter)
     await expect(service.preview({ url: 'https://gitcode.com/OpenMatrix/MatrixAssistant/pull/1958', zone: 'yellow' })).rejects.toMatchObject({ code: 'ZONE_MISMATCH' })
     expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
+  it('uses the shared active Provider and keeps review cache valid when only its credential rotates', async () => {
+    const sourceFetch = vi.fn(async (input: string | URL | Request) => String(input).endsWith('/files')
+      ? new Response(JSON.stringify([{ filename: 'src/Demo.ts', status: 'modified', additions: 1, deletions: 0, patch: { diff: '@@ -1,1 +1,2 @@\n old\n+new', new_path: 'src/Demo.ts' } }]), { status: 200 })
+      : new Response(JSON.stringify({ title: 'Demo', state: 'open', base: { ref: 'main' }, head: { ref: 'feature', sha: 'head' } }), { status: 200 }))
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ summary: '完成', findings: [] }) } }] }), { status: 200 })))
+    const adapter = new GitCodeAdapter({ getAccessToken: () => 'gitcode-token', fetchImpl: sourceFetch })
+    const cache = new CodeReviewCache(new MemoryStorage(), { ...crypto, isAvailable: () => false })
+    let providerCalls = 0
+    let apiKey = 'provider-key-one'
+    const providers = {
+      getActivePublic: async () => ({ id: 'shared', name: 'Shared', source: 'manual' as const, baseUrl: 'https://ai.example/v1', modelId: 'common-model', apiKeyConfigured: true, status: 'ready' as const, active: true, editable: true, identityFingerprint: 'stable-model-identity' }),
+      execute: async <T>(id: string, operation: (provider: ResolvedAiProvider) => Promise<T>): Promise<T> => {
+        expect(id).toBe('shared')
+        providerCalls += 1
+        return operation({ id: 'shared', name: 'Shared', source: 'manual', baseUrl: 'https://ai.example/v1', modelId: 'common-model', apiKey, identityFingerprint: 'stable-model-identity', credentialFingerprint: apiKey })
+      }
+    }
+    const service = new CodeReviewService(cache, adapter, async () => null, providers)
+    const input = { url: 'https://gitcode.com/team/repo/pull/1', zone: 'blue' as const }
+    expect((await service.run(input)).cacheStatus).toBe('miss')
+    apiKey = 'provider-key-two'
+    expect((await service.run(input)).cacheStatus).toBe('hit')
+    expect(providerCalls).toBe(1)
   })
 
   it('marks the current head as passed or problematic and older heads as stale', () => {

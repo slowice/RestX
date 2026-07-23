@@ -22,6 +22,7 @@
     "src/platform/shared/**/*.ts",
     "src/platform/renderer/**/*.ts",
     "src/platform/renderer/**/*.tsx",
+    "src/platform/ai-provider/shared/**/*.ts",
     "src/features/*/shared/**/*.ts",
     "src/features/*/renderer/**/*.ts",
     "src/features/*/renderer/**/*.tsx",

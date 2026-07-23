@@ -1,5 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { CodeReviewResult, GitCodeConnectionStatus, GitCodeMergeRequestList, PreviewReviewSourceInput, ReviewFinding, ReviewSourcePreview, RunCodeReviewInput } from '../../shared/contracts/code-review'
+import type { AiProviderPublic, ResolvedAiProvider } from '../../../../platform/ai-provider/shared/contracts'
+import { aiProviderRegistry } from '../../../../platform/ai-provider/main/provider-registry'
 import { CodeHubAdapter } from './codehub-adapter'
 import { buildReviewBatches, CODE_REVIEW_PROMPT_VERSION, reviewCodeBatch } from './code-review-provider'
 import { MergeRequestAdapterRegistry, ReviewSourceError } from './code-review-source'
@@ -8,14 +10,17 @@ import { GitCodeAdapter, GITCODE_API_BASE_URL } from './gitcode-adapter'
 import { gitCodeSettings } from './gitcode-settings'
 import { readGlobalGitEmail } from './local-git-identity'
 import { selectReviewRulePacks } from './review-rule-packs'
-import { reviewZoneSettings } from './review-zone-settings'
 import { writeReviewAudit } from './review-audit-logger'
 
 export class CodeReviewService {
   constructor(
     private readonly reviewCache?: CodeReviewCache,
     private readonly gitCode = new GitCodeAdapter({ getAccessToken: () => gitCodeSettings.getSecret() }),
-    private readonly readGitEmail: () => Promise<string | null> = readGlobalGitEmail
+    private readonly readGitEmail: () => Promise<string | null> = readGlobalGitEmail,
+    private readonly providers: {
+      getActivePublic(): Promise<AiProviderPublic>
+      execute<T>(id: string, operation: (provider: ResolvedAiProvider) => Promise<T>): Promise<T>
+    } = aiProviderRegistry
   ) {}
 
   private registry(): MergeRequestAdapterRegistry {
@@ -42,13 +47,13 @@ export class CodeReviewService {
 
   async run(input: RunCodeReviewInput): Promise<CodeReviewResult> {
     const { adapter, locator } = this.registry().resolve(input.url)
-    if (adapter.zone !== input.zone || locator.zone !== input.zone) throw new ReviewSourceError('代码来源与 AI 区域不匹配，已阻止发送。', 'ZONE_MISMATCH')
+    if (adapter.zone !== input.zone || locator.zone !== input.zone) throw new ReviewSourceError('代码来源与所选数据区域不匹配，已阻止发送。', 'ZONE_MISMATCH')
     const source = await adapter.load(locator)
     const eligible = source.files.filter((file) => file.eligible)
     if (!eligible.length) throw new ReviewSourceError('该 MR 没有可发送的文本 diff。', 'NO_ELIGIBLE_CHANGES')
     const rulePacks = selectReviewRulePacks(input.zone, eligible.map((file) => file.path))
-    const provider = reviewZoneSettings.getPublic(input.zone)
-    const fingerprint = createHash('sha256').update(JSON.stringify({ sourceId: source.preview.sourceId, zone: input.zone, model: provider.model, baseUrl: provider.baseUrl, prompt: CODE_REVIEW_PROMPT_VERSION, rules: rulePacks.map((rule) => `${rule.id}@${rule.version}`), requirements: input.requirements?.trim() ?? '' })).digest('hex')
+    const provider = await this.providers.getActivePublic()
+    const fingerprint = createHash('sha256').update(JSON.stringify({ sourceId: source.preview.sourceId, zone: input.zone, provider: provider.identityFingerprint, model: provider.modelId, baseUrl: provider.baseUrl, prompt: CODE_REVIEW_PROMPT_VERSION, rules: rulePacks.map((rule) => `${rule.id}@${rule.version}`), requirements: input.requirements?.trim() ?? '' })).digest('hex')
     const reviewId = randomUUID()
     const started = Date.now()
     const sourceHash = createHash('sha256').update(source.preview.sourceId).digest('hex')
@@ -60,13 +65,16 @@ export class CodeReviewService {
         return { ...cached, cacheStatus: 'hit' }
       }
     }
-    const settings = reviewZoneSettings.getSecret(input.zone)
     const batches = buildReviewBatches(eligible, rulePacks, input.requirements)
     const findings: ReviewFinding[] = []
     const summaries: string[] = []
+    let usedModel = provider.modelId
     try {
       for (const batch of batches) {
-        const response = await reviewCodeBatch({ settings, batch, rulePacks, requirements: input.requirements, sourceSummary: { title: source.preview.title, repository: `${locator.owner}/${locator.repository}`, baseBranch: source.preview.baseBranch, headBranch: source.preview.headBranch } })
+        const response = await this.providers.execute(provider.id, (resolved) => {
+          usedModel = resolved.modelId
+          return reviewCodeBatch({ settings: { baseUrl: resolved.baseUrl, model: resolved.modelId, apiKey: resolved.apiKey }, batch, rulePacks, requirements: input.requirements, sourceSummary: { title: source.preview.title, repository: `${locator.owner}/${locator.repository}`, baseBranch: source.preview.baseBranch, headBranch: source.preview.headBranch } })
+        })
         summaries.push(response.summary)
         findings.push(...response.findings)
       }
@@ -80,15 +88,15 @@ export class CodeReviewService {
         findings: unique,
         reviewedFiles: eligible.length,
         excludedFiles: source.preview.excludedFiles,
-        model: settings.model,
+        model: usedModel,
         rules: rulePacks.map(({ id, name, version }) => ({ id, name, version })),
         analyzedAt: now.toISOString(),
         cacheStatus: input.force ? 'refresh' : 'miss'
       })
-      await writeReviewAudit({ timestamp: now.toISOString(), reviewId, zone: input.zone, sourceHash, fileCount: eligible.length, inputCharacters: source.preview.inputCharacters, model: settings.model, durationMs: Date.now() - started, status: 'success', findingCount: unique.length })
+      await writeReviewAudit({ timestamp: now.toISOString(), reviewId, zone: input.zone, sourceHash, fileCount: eligible.length, inputCharacters: source.preview.inputCharacters, model: usedModel, durationMs: Date.now() - started, status: 'success', findingCount: unique.length })
       return result
     } catch (error) {
-      await writeReviewAudit({ timestamp: new Date().toISOString(), reviewId, zone: input.zone, sourceHash, fileCount: eligible.length, inputCharacters: source.preview.inputCharacters, model: settings.model, durationMs: Date.now() - started, status: 'failed' })
+      await writeReviewAudit({ timestamp: new Date().toISOString(), reviewId, zone: input.zone, sourceHash, fileCount: eligible.length, inputCharacters: source.preview.inputCharacters, model: usedModel, durationMs: Date.now() - started, status: 'failed' })
       throw error
     }
   }

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, Bot, Braces, CheckCircle2, ChevronRight, Clock3, FileCode2, LoaderCircle, RefreshCw, ShieldCheck, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import type { AiAnalysisRecord, AiAnalysisResponse, AiProviderPublicSettings } from '../../shared/contracts/ai-capability'
+import type { AiAnalysisRecord, AiAnalysisResponse } from '../../shared/contracts/ai-capability'
+import type { AiProviderPublic } from '../../../../platform/ai-provider/shared/contracts'
 import type { ConfigDocument, ConfigValue } from '../../shared/contracts/config'
 import { formatBytes, formatDate } from '../format'
 import { useInspectorState } from '../state/InspectorState'
@@ -67,7 +68,7 @@ function formatScalar(value: string | number | boolean | null): string {
 
 function AnalysisPanel({ document }: { document: ConfigDocument }): React.JSX.Element {
   const { preferences } = useInspectorState()
-  const [provider, setProvider] = useState<AiProviderPublicSettings | null>(null)
+  const [provider, setProvider] = useState<AiProviderPublic | null>(null)
   const [record, setRecord] = useState<AiAnalysisRecord | null>(null)
   const [cacheLabel, setCacheLabel] = useState<'cached' | 'fresh' | 'refreshed' | null>(null)
   const [status, setStatus] = useState<'loading-cache' | 'idle' | 'analyzing' | 'complete' | 'error'>('loading-cache')
@@ -79,10 +80,10 @@ function AnalysisPanel({ document }: { document: ConfigDocument }): React.JSX.El
     setStatus('loading-cache')
     setRecord(null)
     setStale(false)
-    void Promise.all([window.restx.ai.getProviderSettings(), window.restx.ai.getCachedAnalysis(document.path)])
-      .then(([settings, cached]) => {
+    void Promise.all([window.restx.providers.getState(), window.restx.ai.getCachedAnalysis(document.path)])
+      .then(([providerState, cached]) => {
         if (!active) return
-        setProvider(settings)
+        setProvider(providerState.providers.find((item) => item.id === providerState.activeProviderId) ?? null)
         setStale(cached.status === 'stale')
         if (cached.status === 'valid' && cached.record) {
           setRecord(cached.record)
@@ -115,7 +116,7 @@ function AnalysisPanel({ document }: { document: ConfigDocument }): React.JSX.El
 
   if (status === 'loading-cache') return <div className="analysis-state"><LoaderCircle className="spin" size={25} /><p>正在检查本地解析缓存…</p></div>
   if (!preferences?.aiLocalAnalysisEnabled) return <AnalysisPrerequisite title="尚未允许 AI 分析本地内容" description="RestX 只会发送经过脱敏的配置数据。请先在设置中明确开启授权。" />
-  if (!provider?.model || !provider.apiKeyConfigured) return <AnalysisPrerequisite title="AI 服务尚未配置" description="设置一个 OpenAI-compatible Base URL、模型和 API Key 后即可解析。" />
+  if (!provider || provider.status !== 'ready') return <AnalysisPrerequisite title="AI 服务尚未配置" description="新增并选择一个包含 Base URL、模型 ID 和 API Key 的 Provider 后即可解析。" />
   if (status === 'analyzing') return <div className="analysis-state"><LoaderCircle className="spin" size={28} /><h3>模型正在理解配置…</h3><p>发送内容已脱敏，请保持 RestX 运行。</p></div>
   if (status === 'error') return <div className="analysis-state error"><AlertTriangle size={28} /><h3>解析未完成</h3><p>{error}</p><button className="button secondary" onClick={() => void analyze(false)}>重试</button></div>
   if (status === 'complete' && record) return <AnalysisResult record={record} cacheLabel={cacheLabel} onRefresh={() => void analyze(true)} />
@@ -125,7 +126,7 @@ function AnalysisPanel({ document }: { document: ConfigDocument }): React.JSX.El
       <div className="analysis-icon"><Bot size={26} /></div>
       <h3>{stale ? '配置已更新，需要重新解析' : '让 AI 帮你理解这份配置'}</h3>
       <p>模型将收到脱敏后的配置数据，并返回用途说明、风险提示和优化建议。</p>
-      <div className="analysis-privacy"><ShieldCheck size={14} />{document.redactionCount} 个敏感值已脱敏 · 使用 {provider.model}</div>
+      <div className="analysis-privacy"><ShieldCheck size={14} />{document.redactionCount} 个敏感值已脱敏 · 使用 {provider.modelId}</div>
       <button className="button primary" onClick={() => void analyze(false)}><Bot size={15} />{stale ? '重新解析配置' : '开始 AI 解析'}</button>
     </div>
   )

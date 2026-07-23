@@ -23,9 +23,6 @@ export const aiInspectorPreloadFeature = definePreloadFeature({
         clearHistory: () => invoke(channels.clearHistory)
       },
       ai: {
-        getRuntimeStatus: () => invoke(channels.getRuntimeStatus),
-        getProviderSettings: () => invoke(channels.getProviderSettings),
-        updateProviderSettings: (input) => invoke(channels.updateProviderSettings, input),
         analyzeConfig: (input) => invoke(channels.analyzeConfig, input),
         getCachedAnalysis: (filePath) => invoke(channels.getCachedAnalysis, filePath),
         clearAnalysisCache: () => invoke(channels.clearAnalysisCache)

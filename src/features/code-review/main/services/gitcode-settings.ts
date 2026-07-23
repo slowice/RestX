@@ -1,11 +1,22 @@
 import { safeStorage } from 'electron'
 import Store from 'electron-store'
 import type { GitCodePublicSettings, GitCodeSettingsInput } from '../../shared/contracts/code-review'
-import type { ProviderSettingsStorage, SecretCrypto } from './provider-settings'
 import { GITCODE_API_BASE_URL } from './gitcode-adapter'
 import { ReviewSourceError } from './code-review-source'
 
 const ENCRYPTED_TOKEN_KEY = 'encryptedAccessToken'
+
+export interface ProviderSettingsStorage {
+  get(key: string): unknown
+  set(key: string, value: unknown): void
+  delete(key: string): void
+}
+
+export interface SecretCrypto {
+  isAvailable(): boolean
+  encrypt(value: string): string
+  decrypt(value: string): string
+}
 
 export class GitCodeSettingsManager {
   constructor(private readonly storage: ProviderSettingsStorage, private readonly crypto: SecretCrypto) {}

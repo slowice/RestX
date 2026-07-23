@@ -26,11 +26,13 @@ export function createAnalysisFingerprint(input: {
   sourceHash: string
   baseUrl: string
   model: string
+  providerId?: string
   promptVersion: string
 }): string {
   return createHash('sha256').update(JSON.stringify({
     sourceHash: input.sourceHash,
     provider: 'openai-compatible',
+    providerId: input.providerId ?? null,
     baseUrl: normalizeBaseUrl(input.baseUrl),
     model: input.model.trim(),
     promptVersion: input.promptVersion

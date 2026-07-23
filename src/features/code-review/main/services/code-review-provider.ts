@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { ReviewCategory, ReviewConfidence, ReviewFinding, ReviewSeverity } from '../../shared/contracts/code-review'
-import { normalizeBaseUrl, ProviderError, type ProviderSecretSettings } from './provider-settings'
+import { AiProviderError as ProviderError, normalizeAiBaseUrl as normalizeBaseUrl } from '../../../../platform/ai-provider/main/openai-client'
 import type { ChangedReviewFile } from './code-review-source'
 import type { ReviewRulePack } from './review-rule-packs'
 
@@ -11,6 +11,8 @@ const CONFIDENCES: ReviewConfidence[] = ['high', 'medium', 'low']
 const MAX_BATCH_CHARACTERS = 58_000
 
 type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
+
+type ProviderSecretSettings = { baseUrl: string; model: string; apiKey: string }
 
 export type ReviewBatch = { files: ChangedReviewFile[]; inputCharacters: number }
 export type ReviewProviderResponse = { summary: string; findings: ReviewFinding[] }
@@ -121,7 +123,7 @@ export async function reviewCodeBatch({ settings, batch, rulePacks, requirements
   try {
     response = await fetchImpl(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settings.apiKey}` }, body, redirect: 'error', signal: AbortSignal.timeout(180_000) })
   } catch {
-    throw new ProviderError('无法连接代码检视 AI 服务，请检查当前区域的模型配置和网络。', 'CONNECTION_FAILED')
+    throw new ProviderError('无法连接代码检视 AI 服务，请检查当前 Provider 和网络。', 'CONNECTION_FAILED')
   }
   if (response.status === 401 || response.status === 403) throw new ProviderError('代码检视 AI 服务认证失败。', 'AUTHENTICATION_FAILED')
   if (response.status === 429) throw new ProviderError('代码检视 AI 服务请求过于频繁，请稍后重试。', 'RATE_LIMITED')

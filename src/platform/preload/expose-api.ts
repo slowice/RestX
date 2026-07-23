@@ -8,6 +8,15 @@ export function createPlatformApi(invoke: PreloadInvoke): PlatformApi {
   return {
     app: {
       getVersion: () => invoke<string>(platformChannels.getVersion)
+    },
+    providers: {
+      getState: () => invoke(platformChannels.getProviders),
+      create: (input) => invoke(platformChannels.createProvider, input),
+      update: (input) => invoke(platformChannels.updateProvider, input),
+      delete: (id) => invoke(platformChannels.deleteProvider, id),
+      setActive: (id) => invoke(platformChannels.setActiveProvider, id),
+      test: (id) => invoke(platformChannels.testProvider, id),
+      refreshExternal: () => invoke(platformChannels.refreshExternalProviders)
     }
   }
 }
