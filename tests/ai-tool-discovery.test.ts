@@ -4,6 +4,19 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { discoverAiTools, validateAiToolPresets } from '../src/features/ai-inspector/main/services/ai-tool-discovery'
 import type { AiToolPreset } from '../src/features/ai-inspector/main/presets/ai-tools'
+import type { AiToolProbe } from '../src/features/ai-inspector/shared/contracts/ai-tool-preset'
+
+const typeCheckedRelativeProbe = { relativePath: '.tool', entryType: 'directory' } satisfies AiToolProbe
+const typeCheckedAbsoluteProbe = { path: '${HOME}/.tool', entryType: 'directory' } satisfies AiToolProbe
+// @ts-expect-error AI tool probes must declare exactly one path field.
+const typeRejectedBothPathProbe: AiToolProbe = { relativePath: '.tool', path: '${HOME}/.tool', entryType: 'directory' }
+// @ts-expect-error AI tool probes must declare exactly one path field.
+const typeRejectedMissingPathProbe: AiToolProbe = { entryType: 'directory' }
+
+void typeCheckedRelativeProbe
+void typeCheckedAbsoluteProbe
+void typeRejectedBothPathProbe
+void typeRejectedMissingPathProbe
 
 const temporaryDirectories: string[] = []
 

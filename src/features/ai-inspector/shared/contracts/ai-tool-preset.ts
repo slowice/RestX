@@ -1,9 +1,13 @@
 import type { CandidateKind, CandidateViewer } from './inspector'
 import type { JsonlTagTone } from './jsonl'
 
-export type AiToolPathFields = {
-  relativePath?: string
-  path?: string
+export type AiToolPathFields = ({
+  relativePath: string
+  path?: never
+} | {
+  path: string
+  relativePath?: never
+}) & {
   platforms?: NodeJS.Platform[]
 }
 
