@@ -5,6 +5,7 @@ import { MAIL_TEMPLATE_LIMITS, type ImportedMailMessage } from '../shared/contra
 import { isValidEmailAddress } from '../shared/template-engine'
 
 type FileStat = { size: number; isFile(): boolean }
+type MsgReaderConstructor = new (arrayBuffer: ArrayBuffer | DataView) => { getFileData(): FieldsData }
 
 export type MessageImportDependencies = {
   selectFile(): Promise<string | null>
@@ -54,9 +55,18 @@ async function parseEmlMessage(buffer: Buffer, sourceName: string): Promise<Impo
 
 function parseMsgMessage(buffer: Buffer, sourceName: string): ImportedMailMessage {
   const arrayBuffer = Uint8Array.from(buffer).buffer
-  const fields = new MsgReader(arrayBuffer).getFileData()
+  const MessageReader = resolveMsgReaderConstructor(MsgReader)
+  const fields = new MessageReader(arrayBuffer).getFileData()
   if (fields.error) throw new Error('导入失败：MSG 文件内容无效。')
   return normalizeMsgFields(fields, sourceName)
+}
+
+export function resolveMsgReaderConstructor(value: unknown): MsgReaderConstructor {
+  if (typeof value === 'function') return value as MsgReaderConstructor
+  if (value && typeof value === 'object' && 'default' in value && typeof value.default === 'function') {
+    return value.default as MsgReaderConstructor
+  }
+  throw new Error('导入失败：MSG 解析组件加载失败。')
 }
 
 export function normalizeMsgFields(fields: FieldsData, sourceName: string): ImportedMailMessage {

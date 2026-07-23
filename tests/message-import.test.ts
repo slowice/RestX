@@ -5,6 +5,7 @@ import {
   importOutlookMessage,
   normalizeMsgFields,
   parseOutlookMessage,
+  resolveMsgReaderConstructor,
   type MessageImportDependencies
 } from '../src/features/mail-template/main/message-import'
 
@@ -41,6 +42,12 @@ function dependencies(overrides: Partial<MessageImportDependencies> = {}): Messa
 }
 
 describe('Outlook message import', () => {
+  it('unwraps the CommonJS default export shape used by Electron ESM', () => {
+    class FakeMsgReader {}
+
+    expect(resolveMsgReaderConstructor({ default: FakeMsgReader })).toBe(FakeMsgReader)
+  })
+
   it('parses EML recipients and converts HTML-only content without scripts', async () => {
     const imported = await parseOutlookMessage(htmlEml, 'eml', 'weekly.eml')
     expect(imported).toMatchObject({
