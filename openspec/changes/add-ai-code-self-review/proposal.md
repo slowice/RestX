@@ -8,6 +8,7 @@
 - 支持粘贴 GitCode Pull Request/Merge Request 链接并读取 PR 元数据、变更文件和 diff；同时保留本地 Git 仓库差异来源。
 - 自动读取本机全局 Git 邮箱，与 GitCode 授权账号邮箱进行校验，并展示该账号当前创建且仍开放的 Pull Request 列表供直接选择。
 - 增加可插拔的远程代码源适配器，首版完整实现 GitCode，只为 CodeHub 提供稳定契约和待配置状态。
+- 为 CodeHub 预留独立的 `PRIVATE-TOKEN` 安全配置，当前仅支持保存、替换和移除，后续由黄区适配器通过同名请求头使用。
 - 按安全、低级错误、日志、测试和仓库一致性生成结构化检视发现，结果只展示、不回写代码平台。
 - 使用 Skill 风格的 Markdown 规则包承载内置和仓库规则，并限制仓库规则覆盖安全或网络策略。
 - 蓝区与黄区使用独立 AI Provider 配置；黄区代码禁止降级或发送到蓝区 Provider。
@@ -33,5 +34,5 @@
 - 扩展 React 模块清单、路由、设置页和页面样式。
 - 扩展 shared contracts、preload API 和 Electron IPC 白名单。
 - 新增 GitCode 客户端、代码源适配器、规则加载器、检视编排、缓存和审计服务。
-- 复用 `safeStorage` 保存 GitCode PAT 和区域 Provider 密钥，但不复用会记录请求/响应正文的现有 AI 调用日志。
+- 复用 `safeStorage` 保存 GitCode PAT、CodeHub `PRIVATE-TOKEN` 和 Provider 密钥，但不复用会记录请求/响应正文的现有 AI 调用日志。
 - 首版继续使用现有 OpenAI-compatible `/chat/completions` 协议，不新增运行时依赖。

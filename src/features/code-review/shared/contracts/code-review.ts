@@ -99,6 +99,15 @@ export type GitCodeConnectionStatus = {
   message: string
 }
 
+export type CodeHubPublicSettings = {
+  privateTokenConfigured: boolean
+}
+
+export type CodeHubSettingsInput = {
+  privateToken?: string
+  clearPrivateToken?: boolean
+}
+
 export type GitCodeIdentityMatch = 'matched' | 'mismatched' | 'local-email-unavailable' | 'remote-email-unavailable'
 export type MergeRequestReviewStatus = 'unreviewed' | 'passed' | 'issues' | 'stale'
 

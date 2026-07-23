@@ -55,3 +55,9 @@
 - [x] 8.3 Derive per-Pull Request passed, issues, stale, or unreviewed state from the encrypted seven-day cache and current head SHA
 - [x] 8.4 Add the selectable Pull Request list, identity state, refresh action, manual-link fallback, and immediate review-status updates to the workbench
 - [x] 8.5 Add adapter, cache, IPC, and renderer tests, then run typecheck, test, build, and diff validation
+
+## 9. CodeHub source credential
+
+- [x] 9.1 Add CodeHub PRIVATE-TOKEN contracts, encrypted feature-owned storage, validated IPC handlers, and preload methods
+- [x] 9.2 Add CodeHub PRIVATE-TOKEN save, replace, configured-state, and removal controls beside the GitCode source settings
+- [x] 9.3 Add storage, preload, and renderer tests, then run typecheck, test, build, and diff validation

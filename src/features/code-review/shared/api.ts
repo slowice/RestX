@@ -1,4 +1,6 @@
 import type {
+  CodeHubPublicSettings,
+  CodeHubSettingsInput,
   CodeReviewResult,
   GitCodeConnectionStatus,
   GitCodeMergeRequestList,
@@ -17,6 +19,8 @@ export type CodeReviewApi = {
     getGitCodeSettings(): Promise<GitCodePublicSettings>
     updateGitCodeSettings(input: GitCodeSettingsInput): Promise<GitCodePublicSettings>
     testGitCodeConnection(): Promise<GitCodeConnectionStatus>
+    getCodeHubSettings(): Promise<CodeHubPublicSettings>
+    updateCodeHubSettings(input: CodeHubSettingsInput): Promise<CodeHubPublicSettings>
     clearCache(): Promise<{ cleared: number }>
   }
 }

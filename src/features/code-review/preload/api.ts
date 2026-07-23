@@ -15,6 +15,8 @@ export const codeReviewPreloadFeature = definePreloadFeature({
         getGitCodeSettings: () => invoke(channels.getGitCodeSettings),
         updateGitCodeSettings: (input) => invoke(channels.updateGitCodeSettings, input),
         testGitCodeConnection: () => invoke(channels.testGitCodeConnection),
+        getCodeHubSettings: () => invoke(channels.getCodeHubSettings),
+        updateCodeHubSettings: (input) => invoke(channels.updateCodeHubSettings, input),
         clearCache: () => invoke(channels.clearCache)
       }
     }
