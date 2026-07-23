@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import Store from 'electron-store'
+import { getRestxStorageLayout } from '../../../../platform/main/storage'
 import type { AiAnalysisRecord, CachedAnalysisResponse } from '../../shared/contracts/ai-capability'
 import { normalizeBaseUrl } from './openai-provider'
 
@@ -72,7 +73,7 @@ let persistentCache: AnalysisCache | null = null
 
 export function getPersistentAnalysisCache(): AnalysisCache {
   if (persistentCache) return persistentCache
-  const store = new Store<{ entries: CacheEntries }>({ name: 'analysis-cache', defaults: { entries: {} } })
+  const store = new Store<{ entries: CacheEntries }>({ name: 'analysis-cache', cwd: getRestxStorageLayout().cache, defaults: { entries: {} } })
   persistentCache = new AnalysisCache({
     read: () => store.get('entries'),
     write: (value) => store.set('entries', value as CacheEntries)

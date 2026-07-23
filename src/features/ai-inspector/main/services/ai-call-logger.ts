@@ -1,6 +1,6 @@
-import { app } from 'electron'
 import { appendFile, mkdir } from 'node:fs/promises'
 import path from 'node:path'
+import { getRestxStorageLayout } from '../../../../platform/main/storage'
 
 export type AiCallLogEvent = {
   timestamp: string
@@ -19,7 +19,7 @@ export interface AiCallLogger {
 }
 
 export function getAiLogDirectory(): string {
-  return path.join(app.getPath('home'), '.RestX', 'log')
+  return getRestxStorageLayout().logs
 }
 
 export function formatLogTimestamp(date = new Date(), timezoneOffsetMinutes = date.getTimezoneOffset()): string {

@@ -31,7 +31,7 @@ function makeApi(): RestXApi {
       listMyGitCodeMergeRequests: vi.fn(async () => ({
         identity: { localGitEmail: 'xubin@example.com', accountLogin: 'xubin', accountName: '徐斌', match: 'matched' as const },
         mergeRequests: [], fetchedAt: '2026-07-22T00:00:00.000Z'
-      })), previewSource: vi.fn(async () => preview), run: vi.fn(async () => result), getGitCodeSettings: vi.fn(), updateGitCodeSettings: vi.fn(), testGitCodeConnection: vi.fn(), clearCache: vi.fn()
+      })), previewSource: vi.fn(async () => preview), run: vi.fn(async () => result), getGitCodeSettings: vi.fn(), updateGitCodeSettings: vi.fn(), testGitCodeConnection: vi.fn(), getCodeHubSettings: vi.fn(), updateCodeHubSettings: vi.fn(), clearCache: vi.fn()
     },
     mailTemplates: { openDraft: vi.fn(), importMessage: vi.fn() }
   }

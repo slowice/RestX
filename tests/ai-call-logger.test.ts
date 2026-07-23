@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 
-vi.mock('electron', () => ({ app: { getPath: () => '/Users/demo' } }))
+vi.mock('node:os', async (importOriginal) => ({ ...await importOriginal<typeof import('node:os')>(), homedir: () => '/Users/demo' }))
 
 import { formatLogTimestamp, getAiLogDirectory } from '../src/features/ai-inspector/main/services/ai-call-logger'
 
 describe('AI call logger', () => {
   it('uses the hidden RestX log directory in the user home', () => {
-    expect(getAiLogDirectory()).toBe('/Users/demo/.RestX/log')
+    expect(getAiLogDirectory()).toBe('/Users/demo/.restx/logs')
   })
 
   it('formats timestamps with the local timezone offset instead of UTC', () => {

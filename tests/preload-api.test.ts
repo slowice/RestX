@@ -25,6 +25,7 @@ describe('preload API composition', () => {
     await api.inspector.chooseDirectory()
     await api.codeReview.listMyGitCodeMergeRequests()
     await api.codeReview.getGitCodeSettings()
+    await api.codeReview.getCodeHubSettings()
     await api.mailTemplates.openDraft({ to: ['user@example.com'], cc: [], bcc: [], subject: '主题', body: '正文' })
     await api.mailTemplates.importMessage()
 
@@ -33,8 +34,9 @@ describe('preload API composition', () => {
     expect(calls).toHaveBeenNthCalledWith(3, aiInspectorChannels.chooseDirectory)
     expect(calls).toHaveBeenNthCalledWith(4, codeReviewChannels.listMyGitCodeMergeRequests)
     expect(calls).toHaveBeenNthCalledWith(5, codeReviewChannels.getGitCodeSettings)
-    expect(calls).toHaveBeenNthCalledWith(6, mailTemplateChannels.openDraft, { to: ['user@example.com'], cc: [], bcc: [], subject: '主题', body: '正文' })
-    expect(calls).toHaveBeenNthCalledWith(7, mailTemplateChannels.importMessage)
+    expect(calls).toHaveBeenNthCalledWith(6, codeReviewChannels.getCodeHubSettings)
+    expect(calls).toHaveBeenNthCalledWith(7, mailTemplateChannels.openDraft, { to: ['user@example.com'], cc: [], bcc: [], subject: '主题', body: '正文' })
+    expect(calls).toHaveBeenNthCalledWith(8, mailTemplateChannels.importMessage)
   })
 
   it('rejects duplicate API methods', () => {

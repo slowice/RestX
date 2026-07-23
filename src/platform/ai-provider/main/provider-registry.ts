@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { safeStorage } from 'electron'
 import Store from 'electron-store'
+import { getRestxStorageLayout } from '../../main/storage'
 import type {
   AiProviderPublic,
   AiProviderState,
@@ -413,7 +414,7 @@ export async function readClaudeCodeProviderConfig(settingsPath = path.join(os.h
 }
 
 function readLegacyStore(name: string, label: string, preferred = false): LegacyProvider | null {
-  const store = new Store<Record<string, unknown>>({ name })
+  const store = new Store<Record<string, unknown>>({ name, cwd: getRestxStorageLayout().config })
   const baseUrl = store.get('baseUrl')
   const modelId = store.get('model')
   const encryptedApiKey = store.get('encryptedApiKey')
@@ -426,6 +427,7 @@ let registryInstance: AiProviderRegistry | null = null
 function createDefaultRegistry(): AiProviderRegistry {
   const store = new Store<StoreShape>({
     name: 'ai-providers',
+    cwd: getRestxStorageLayout().config,
     defaults: { version: STORE_VERSION, migrationVersion: 0, activeProviderId: null, fingerprintKey: '', providers: [] }
   })
   const crypto: AiProviderCrypto = {

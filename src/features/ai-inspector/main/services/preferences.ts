@@ -1,10 +1,12 @@
 import Store from 'electron-store'
+import { getRestxStorageLayout } from '../../../../platform/main/storage'
 import type { AppPreferences } from '../../shared/api'
 
 type StoreShape = AppPreferences
 
 const store = new Store<StoreShape>({
   name: 'preferences',
+  cwd: getRestxStorageLayout().config,
   defaults: {
     recentDirectory: null,
     aiLocalAnalysisEnabled: false

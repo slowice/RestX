@@ -1,4 +1,5 @@
 import type {
+  CodeHubSettingsInput,
   GitCodeSettingsInput,
   PreviewReviewSourceInput,
   ReviewZone,
@@ -8,6 +9,7 @@ import { codeReviewChannels as channels } from '../shared/channels'
 import { defineMainFeature } from '../../../platform/main/define-feature'
 import { getCodeReviewCache } from './services/code-review-cache'
 import { codeReviewService } from './services/code-review-service'
+import { codeHubSettings } from './services/codehub-settings'
 import { gitCodeSettings } from './services/gitcode-settings'
 
 function assertString(value: unknown, name: string): asserts value is string {
@@ -40,6 +42,13 @@ function assertGitCodeSettings(value: unknown): asserts value is GitCodeSettings
   if (input.clearAccessToken !== undefined && typeof input.clearAccessToken !== 'boolean') throw new Error('clearAccessToken 参数无效。')
 }
 
+function assertCodeHubSettings(value: unknown): asserts value is CodeHubSettingsInput {
+  if (!value || typeof value !== 'object') throw new Error('CodeHub 配置无效。')
+  const input = value as Record<string, unknown>
+  if (input.privateToken !== undefined && (typeof input.privateToken !== 'string' || input.privateToken.length > 20_000)) throw new Error('CodeHub PRIVATE-TOKEN 无效。')
+  if (input.clearPrivateToken !== undefined && typeof input.clearPrivateToken !== 'boolean') throw new Error('clearPrivateToken 参数无效。')
+}
+
 export const codeReviewMainFeature = defineMainFeature({
   id: 'code-review',
   provides: ['code-review.main'],
@@ -60,6 +69,11 @@ export const codeReviewMainFeature = defineMainFeature({
       return gitCodeSettings.update(input)
     })
     ipc.handle(channels.testGitCodeConnection, () => codeReviewService.testGitCodeConnection())
+    ipc.handle(channels.getCodeHubSettings, () => codeHubSettings.getPublic())
+    ipc.handle(channels.updateCodeHubSettings, (_event, input: unknown) => {
+      assertCodeHubSettings(input)
+      return codeHubSettings.update(input)
+    })
     ipc.handle(channels.clearCache, () => ({ cleared: getCodeReviewCache().clear() }))
   }
 })

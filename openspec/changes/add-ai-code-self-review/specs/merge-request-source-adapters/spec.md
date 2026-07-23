@@ -54,3 +54,14 @@ RestX SHALL register a yellow-zone CodeHub adapter contract even when platform A
 #### Scenario: Blue-zone user pastes CodeHub URL before configuration
 - **WHEN** the CodeHub adapter cannot recognize or call the configured platform
 - **THEN** RestX reports that the yellow-zone adapter needs to be completed in the yellow environment and does not fall back to GitCode
+
+### Requirement: CodeHub PRIVATE-TOKEN is protected independently
+RestX SHALL allow the user to save, replace, and remove a CodeHub credential named `PRIVATE-TOKEN` using operating-system secure storage without making a CodeHub network request.
+
+#### Scenario: PRIVATE-TOKEN is saved
+- **WHEN** the user saves a non-empty CodeHub `PRIVATE-TOKEN` and secure storage is available
+- **THEN** RestX stores only encrypted token material and returns only a `privateTokenConfigured` flag to the renderer
+
+#### Scenario: CodeHub adapter is implemented later
+- **WHEN** a future yellow-zone adapter needs the configured credential
+- **THEN** it can read the secret internally for the `PRIVATE-TOKEN` request header without changing renderer or preload contracts
