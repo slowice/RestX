@@ -6,8 +6,8 @@ const VALID_KINDS = new Set(['config', 'instruction', 'conversation', 'history',
 const VALID_VIEWERS = new Set(['config', 'jsonl', 'metadata'])
 const VALID_TONES = new Set(['neutral', 'user', 'assistant', 'thinking', 'tool', 'result', 'system', 'error'])
 const VALID_PLATFORMS = new Set<NodeJS.Platform>(['darwin', 'win32', 'linux'])
-const SUPPORTED_PATH_VARIABLES = new Set(['HOME', 'TEMP'])
-const SENSITIVE_PATH = /(?:^|[._/-])(auth|credentials?|secrets?|tokens?|keychain|private[-_]?keys?)(?:[._/-]|$)/i
+const SUPPORTED_PATH_VARIABLES = new Set(['HOME', 'TEMP', 'UID'])
+const SENSITIVE_PATH = /(?:^|[._/-])(auth|credentials?|secrets?|tokens?|keychain|private[-_]?keys?|databases?|caches?)(?:[._/-]|$)/i
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -17,6 +17,10 @@ function isSafeRelativePath(value: string): boolean {
   if (!value || value.length > 1_000 || value.includes('\0') || path.isAbsolute(value)) return false
   const normalized = path.normalize(value)
   return normalized !== '..' && !normalized.startsWith(`..${path.sep}`)
+}
+
+function isSensitivePath(value: string): boolean {
+  return SENSITIVE_PATH.test(value.replaceAll('\\', '/'))
 }
 
 function containsFunction(value: unknown, visited = new Set<object>()): boolean {
@@ -49,7 +53,7 @@ function assertPathFields(
     if (typeof value.path !== 'string' || !value.path.trim() || value.path.length > 1_000 || value.path.includes('\0')) throw new Error(`${label} 路径无效：${String(value.path)}`)
     const variables = [...value.path.matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g)].map((match) => match[1])
     if (variables.some((variable) => !SUPPORTED_PATH_VARIABLES.has(variable))) throw new Error(`${label} 路径包含不支持的变量`)
-    const beginsWithVariable = /^\$\{(HOME|TEMP)\}(?:[\\/]|$)/.test(value.path)
+    const beginsWithVariable = /^\$\{(HOME|TEMP|UID)\}(?:[\\/]|$)/.test(value.path)
     const isAbsoluteLiteral = path.isAbsolute(value.path) || /^[A-Za-z]:[\\/]/.test(value.path) || value.path.startsWith('\\\\')
     if (!beginsWithVariable && !isAbsoluteLiteral) throw new Error(`${label} 路径必须以受支持变量或绝对路径开头`)
     const segments = value.path.split(/[\\/]+/)
@@ -132,7 +136,7 @@ export function validateAiToolPresets(presets: readonly AiToolPreset[]): void {
       assertPathFields(probe, 'AI 工具探针')
       const probePath = probe.relativePath ?? probe.path
       if (typeof probePath !== 'string') throw new Error(`AI 工具探针路径无效：${preset.id}`)
-      if (SENSITIVE_PATH.test(probePath)) throw new Error(`AI 工具探针不能指向敏感路径：${probePath}`)
+      if (isSensitivePath(probePath)) throw new Error(`AI 工具探针不能指向敏感路径：${probePath}`)
       if (probe.entryType !== 'file' && probe.entryType !== 'directory') throw new Error(`AI 工具探针类型无效：${preset.id}`)
     }
     let ruleCount = 0
@@ -147,7 +151,7 @@ export function validateAiToolPresets(presets: readonly AiToolPreset[]): void {
       const sourcePath = source.relativePath ?? source.path
       if (typeof sourcePath !== 'string') throw new Error(`AI 工具来源路径无效：${preset.id}/${source.id}`)
       if (typeof source.maxDepth !== 'number' || !Number.isInteger(source.maxDepth) || source.maxDepth < 0 || source.maxDepth > 12) throw new Error(`AI 工具来源无效：${preset.id}/${source.id}`)
-      if (SENSITIVE_PATH.test(sourcePath)) throw new Error(`AI 工具来源不能指向敏感路径：${preset.id}/${source.id}`)
+      if (isSensitivePath(sourcePath)) throw new Error(`AI 工具来源不能指向敏感路径：${preset.id}/${source.id}`)
       if (!Array.isArray(source.patterns) || source.patterns.length === 0) throw new Error(`AI 工具来源没有匹配规则：${preset.id}/${source.id}`)
       ruleCount += source.patterns.length
       if (ruleCount > 80) throw new Error(`AI 工具匹配规则过多：${preset.id}`)

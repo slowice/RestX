@@ -118,6 +118,32 @@ describe('AI tool discovery framework', () => {
     expect(() => validateAiToolPresets([withProbeFields({ path: '${HOME}/wild*/portable' })])).toThrow()
     expect(() => validateAiToolPresets([withProbeFields({ path: '${HOME}/portable/**/logs' })])).toThrow()
     expect(() => validateAiToolPresets([withProbeFields({ path: '${HOME}/.portable', platforms: ['freebsd'] })])).toThrow()
+    expect(() => validateAiToolPresets([withProbeFields({ path: '${HOME}\\credentials\\token.json' })])).toThrow()
+    expect(() => validateAiToolPresets([withProbeFields({ path: '${HOME}/auth/session.json' })])).toThrow()
+    expect(() => validateAiToolPresets([withProbeFields({ path: '${HOME}/secret/settings.json' })])).toThrow()
+    expect(() => validateAiToolPresets([withProbeFields({ path: '${HOME}/token.json' })])).toThrow()
+    expect(() => validateAiToolPresets([withProbeFields({ path: '${HOME}/cache/openclaw.json' })])).toThrow()
+    expect(() => validateAiToolPresets([withProbeFields({ path: '${HOME}/database/openclaw.db' })])).toThrow()
+    expect(() => validateAiToolPresets([withProbeFields({ path: '${UID}/.openclaw' })])).not.toThrow()
+    expect(() => validateAiToolPresets([withProbeFields({ path: '${HOME}/.openclaw' })])).not.toThrow()
+  })
+
+  it('skips unresolved portable paths while discovery remains root-bound', async () => {
+    const root = await makeFixture()
+    await mkdir(path.join(root, '.local'))
+    const preset: AiToolPreset = {
+      id: 'portable-source', displayName: 'Portable Source', version: 1,
+      probes: [{ relativePath: '.local', entryType: 'directory' }],
+      sources: [{
+        id: 'portable', path: '${UID}/.openclaw', label: 'Portable files', maxDepth: 1,
+        patterns: [{ glob: '*.json', kind: 'config', viewer: 'config', label: 'Config' }]
+      }]
+    }
+
+    const result = await discoverAiTools(root, limits, [preset])
+
+    expect(result.tools[0]).toMatchObject({ id: 'portable-source', status: 'detected' })
+    expect(result.candidates).toEqual([])
   })
 
   it('rejects executable callbacks in a declarative preset', () => {

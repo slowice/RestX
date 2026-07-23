@@ -56,6 +56,10 @@ function resolveWithin(rootPath: string, relativePath: string): string {
   return resolved
 }
 
+function hasRelativePath<T extends { relativePath?: string }>(value: T): value is T & { relativePath: string } {
+  return typeof value.relativePath === 'string'
+}
+
 function globToRegExp(glob: string): RegExp {
   let pattern = '^'
   for (let index = 0; index < glob.length; index += 1) {
@@ -90,6 +94,7 @@ function pushSkipped(skipped: SkippedEntry[], entry: SkippedEntry): void {
 async function detectPreset(rootPath: string, preset: AiToolPreset, skipped: SkippedEntry[]): Promise<DetectedAiTool['evidence']> {
   const evidence: DetectedAiTool['evidence'] = []
   for (const probe of preset.probes) {
+    if (!hasRelativePath(probe)) continue
     const probePath = resolveWithin(rootPath, probe.relativePath)
     try {
       const stat = await lstat(probePath)
@@ -240,7 +245,7 @@ export async function discoverAiTools(
     }
   }
 
-  async function walkSource(directory: string, depth: number, preset: AiToolPreset, source: AiToolSource): Promise<void> {
+  async function walkSource(directory: string, depth: number, preset: AiToolPreset, source: AiToolSource & { relativePath: string }): Promise<void> {
     if (limitReached || depth > source.maxDepth) return
     let entries
     try {
@@ -269,6 +274,7 @@ export async function discoverAiTools(
     if (item.evidence.length === 0) continue
     for (const source of item.preset.sources) {
       if (limitReached) break
+      if (!hasRelativePath(source)) continue
       const sourcePath = resolveWithin(rootPath, source.relativePath)
       try {
         const stat = await lstat(sourcePath)
