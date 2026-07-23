@@ -81,7 +81,8 @@ function makeApi(): RestXApi {
       analyzeConfig: vi.fn(), getCachedAnalysis: vi.fn(async (): Promise<CachedAnalysisResponse> => ({ status: 'none', record: null })), clearAnalysisCache: vi.fn()
     },
     presets: { list: vi.fn(async () => []), generateDraft: vi.fn(), save: vi.fn(), setEnabled: vi.fn(), delete: vi.fn() },
-    codeReview: { listMyGitCodeMergeRequests: vi.fn(), previewSource: vi.fn(), run: vi.fn(), getGitCodeSettings: vi.fn(), updateGitCodeSettings: vi.fn(), testGitCodeConnection: vi.fn(), getCodeHubSettings: vi.fn(), updateCodeHubSettings: vi.fn(), clearCache: vi.fn() }
+    codeReview: { listMyGitCodeMergeRequests: vi.fn(), previewSource: vi.fn(), run: vi.fn(), getGitCodeSettings: vi.fn(), updateGitCodeSettings: vi.fn(), testGitCodeConnection: vi.fn(), getCodeHubSettings: vi.fn(), updateCodeHubSettings: vi.fn(), clearCache: vi.fn() },
+    mailTemplates: { openDraft: vi.fn(async () => undefined), importMessage: vi.fn(async () => null) }
   }
 }
 
@@ -93,6 +94,8 @@ describe('Inspector tool folder browser', () => {
     const api = makeApi()
     Object.defineProperty(window, 'restx', { configurable: true, value: api })
     render(<MemoryRouter><InspectorStateProvider><InspectorPage /></InspectorStateProvider></MemoryRouter>)
+
+    expect(screen.getByRole('heading', { name: '工具扫描' })).toBeInTheDocument()
 
     fireEvent.click(screen.getAllByRole('button', { name: /选择用户目录/ })[0])
 

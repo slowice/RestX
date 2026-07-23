@@ -22,7 +22,7 @@ export function HomePage(): React.JSX.Element {
           <h2>{scanSummary ? '继续检查你的工作区' : '从一次安全扫描开始'}</h2>
           <p>选择一个目录，RestX 只读取文件名与元数据，不读取配置内容，也不会修改任何文件。</p>
           <Link className="button primary" to="/ai-inspector">
-            打开 AI Inspector <ArrowRight size={16} />
+            打开工具扫描 <ArrowRight size={16} />
           </Link>
         </div>
         <div className="hero-visual" aria-hidden="true">

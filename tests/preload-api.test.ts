@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { RestXApi } from '../src/app-api'
 import { aiInspectorChannels } from '../src/features/ai-inspector/shared/channels'
 import { codeReviewChannels } from '../src/features/code-review/shared/channels'
+import { mailTemplateChannels } from '../src/features/mail-template/shared/channels'
 import { createFeatureApiContributions } from '../src/platform/preload/feature-registry'
 import type { PreloadInvoke } from '../src/platform/preload/define-feature'
 import { composeApiContributions, createPlatformApi } from '../src/platform/preload/expose-api'
@@ -25,6 +26,8 @@ describe('preload API composition', () => {
     await api.codeReview.listMyGitCodeMergeRequests()
     await api.codeReview.getGitCodeSettings()
     await api.codeReview.getCodeHubSettings()
+    await api.mailTemplates.openDraft({ to: ['user@example.com'], cc: [], bcc: [], subject: '主题', body: '正文' })
+    await api.mailTemplates.importMessage()
 
     expect(calls).toHaveBeenNthCalledWith(1, platformChannels.getVersion)
     expect(calls).toHaveBeenNthCalledWith(2, aiInspectorChannels.getPreferences)
@@ -32,6 +35,8 @@ describe('preload API composition', () => {
     expect(calls).toHaveBeenNthCalledWith(4, codeReviewChannels.listMyGitCodeMergeRequests)
     expect(calls).toHaveBeenNthCalledWith(5, codeReviewChannels.getGitCodeSettings)
     expect(calls).toHaveBeenNthCalledWith(6, codeReviewChannels.getCodeHubSettings)
+    expect(calls).toHaveBeenNthCalledWith(7, mailTemplateChannels.openDraft, { to: ['user@example.com'], cc: [], bcc: [], subject: '主题', body: '正文' })
+    expect(calls).toHaveBeenNthCalledWith(8, mailTemplateChannels.importMessage)
   })
 
   it('rejects duplicate API methods', () => {

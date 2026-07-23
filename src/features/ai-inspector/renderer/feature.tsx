@@ -5,7 +5,7 @@ import { InspectorStateProvider } from './state/InspectorState'
 export const aiInspectorFeature = defineRendererFeature({
   id: 'ai-inspector',
   order: 20,
-  navigation: { label: 'AI Inspector', icon: ScanSearch, group: 'primary' },
+  navigation: { label: '工具扫描', icon: ScanSearch, group: 'primary' },
   route: {
     path: '/ai-inspector',
     load: () => import('./pages/InspectorPage').then(({ InspectorPage }) => ({ default: InspectorPage }))
