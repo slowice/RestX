@@ -14,7 +14,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isSafeRelativePath(value: string): boolean {
-  if (!value || value.length > 1_000 || value.includes('\0') || path.isAbsolute(value)) return false
+  if (!value || value.length > 1_000 || value.includes('\0') || value.includes('*') || path.isAbsolute(value)) return false
   const normalized = path.normalize(value)
   return normalized !== '..' && !normalized.startsWith(`..${path.sep}`)
 }

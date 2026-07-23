@@ -1,4 +1,4 @@
-import { realpath, readdir } from 'node:fs/promises'
+import { lstat, realpath, readdir } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
 import type { AiToolPathFields } from '../../shared/contracts/ai-tool-preset'
@@ -44,12 +44,39 @@ function terminalWildcardPattern(value: string): RegExp {
   return new RegExp(`^${value.split('*').map((segment) => segment.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')).join('.*')}$`, 'i')
 }
 
-async function resolveTerminalWildcard(resolvedTemplate: string): Promise<string[]> {
+function trustedTemplateBase(template: string, resolvedTemplate: string, environment: PresetPathEnvironment): string {
+  const variable = template.match(/^\$\{(HOME|TEMP|UID)\}(?:[\\/]|$)/)?.[1]
+  if (variable === 'HOME') return path.resolve(environment.homeDirectory)
+  if (variable === 'TEMP') return path.resolve(environment.tempDirectory)
+  if (variable === 'UID' && environment.uid) return path.resolve(environment.uid)
+  return path.parse(resolvedTemplate).root
+}
+
+async function hasSafeWildcardParent(parentPath: string, trustedBase: string): Promise<boolean> {
+  const relativeParent = path.relative(trustedBase, parentPath)
+  if (relativeParent === '') return true
+  if (relativeParent === '..' || relativeParent.startsWith(`..${path.sep}`) || path.isAbsolute(relativeParent)) return false
+
+  let currentPath = trustedBase
+  try {
+    for (const segment of relativeParent.split(path.sep)) {
+      currentPath = path.join(currentPath, segment)
+      if ((await lstat(currentPath)).isSymbolicLink()) return false
+    }
+    return true
+  } catch (error) {
+    if (isUnavailablePathError(error)) return false
+    throw error
+  }
+}
+
+async function resolveTerminalWildcard(resolvedTemplate: string, trustedBase: string): Promise<string[]> {
   const parentPath = path.dirname(resolvedTemplate)
   const basenamePattern = path.basename(resolvedTemplate)
   if (!basenamePattern.includes('*')) return []
 
   try {
+    if (!await hasSafeWildcardParent(parentPath, trustedBase)) return []
     const matcher = terminalWildcardPattern(basenamePattern)
     const children = await readdir(parentPath, { withFileTypes: true })
     const locations = await Promise.all(children
@@ -82,6 +109,7 @@ export async function resolvePresetPaths(
   const template = hasRelativePath ? declaration.relativePath : declaration.path
   const expanded = expandPathTemplate(template, environment)
   if (!expanded) return []
+  if (hasRelativePath && expanded.includes('*')) return []
 
   const resolvedPath = hasRelativePath
     ? path.resolve(rootPath, expanded)
@@ -90,5 +118,7 @@ export async function resolvePresetPaths(
 
   const hasTerminalWildcard = path.basename(resolvedPath).includes('*')
   if (resolvedPath.includes('*') && !hasTerminalWildcard) return []
-  return hasTerminalWildcard ? resolveTerminalWildcard(resolvedPath) : [resolvedPath]
+  return hasTerminalWildcard
+    ? resolveTerminalWildcard(resolvedPath, trustedTemplateBase(template, resolvedPath, environment))
+    : [resolvedPath]
 }

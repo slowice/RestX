@@ -126,6 +126,7 @@ describe('AI tool discovery framework', () => {
 
     expect(() => validateAiToolPresets([withProbeFields({ relativePath: '.portable', path: '${HOME}/.portable' })])).toThrow()
     expect(() => validateAiToolPresets([withProbeFields({})])).toThrow()
+    expect(() => validateAiToolPresets([withProbeFields({ relativePath: '.portable-*' })])).toThrow()
     expect(() => validateAiToolPresets([withProbeFields({ path: '${UNKNOWN}/.portable' })])).toThrow()
     expect(() => validateAiToolPresets([withProbeFields({ path: '${HOME}/../escape' })])).toThrow()
     expect(() => validateAiToolPresets([withProbeFields({ path: '${HOME}/wild*/portable' })])).toThrow()

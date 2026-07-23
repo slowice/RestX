@@ -78,14 +78,43 @@ describe('preset path resolver', () => {
     })).resolves.toEqual([await realpath(path.join(temp, 'OpenClaw-log'))])
   })
 
+  it('normalizes backslash portable templates before resolving terminal wildcards', async () => {
+    const root = await makeFixture()
+    const temp = path.join(root, 'temp')
+    await mkdir(temp)
+    await writeFile(path.join(temp, 'openclaw-log'), '')
+
+    await expect(resolvePresetPaths(root, { path: '${TEMP}\\openclaw-*', platforms: ['win32'] }, {
+      homeDirectory: root, tempDirectory: temp, platform: 'win32'
+    })).resolves.toEqual([await realpath(path.join(temp, 'openclaw-log'))])
+  })
+
+  it('does not enumerate a terminal wildcard through a symbolic-link parent', async () => {
+    const root = await makeFixture()
+    const temp = path.join(root, 'temp')
+    const external = path.join(root, 'external')
+    await mkdir(external)
+    await writeFile(path.join(external, 'openclaw-log'), '')
+    await mkdir(temp)
+    await symlink(external, path.join(temp, 'linked-parent'))
+
+    await expect(resolvePresetPaths(root, { path: '${TEMP}/linked-parent/openclaw-*' }, {
+      homeDirectory: root, tempDirectory: temp, platform: 'darwin'
+    })).resolves.toEqual([])
+  })
+
   it('keeps exact relative paths inside the supplied root', async () => {
     const root = await makeFixture()
     await mkdir(path.join(root, '.openclaw'))
+    await writeFile(path.join(root, '.openclaw-log'), '')
 
     await expect(resolvePresetPaths(root, { relativePath: '.openclaw' }, {
       homeDirectory: root, tempDirectory: root, platform: 'darwin'
     })).resolves.toEqual([path.join(root, '.openclaw')])
     await expect(resolvePresetPaths(root, { relativePath: '../outside' }, {
+      homeDirectory: root, tempDirectory: root, platform: 'darwin'
+    })).resolves.toEqual([])
+    await expect(resolvePresetPaths(root, { relativePath: '.openclaw-*' }, {
       homeDirectory: root, tempDirectory: root, platform: 'darwin'
     })).resolves.toEqual([])
   })
