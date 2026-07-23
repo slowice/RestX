@@ -90,6 +90,36 @@ describe('AI tool discovery framework', () => {
     expect(() => validateAiToolPresets([unsafe])).toThrow(/路径无效/)
   })
 
+  it('accepts portable path fields and rejects unsafe portable path declarations', () => {
+    const portable: AiToolPreset = {
+      id: 'portable', displayName: 'Portable', version: 1,
+      probes: [{ path: '${HOME}/.portable', entryType: 'directory' }],
+      sources: [{
+        id: 'logs', path: '${TEMP}/portable-*', platforms: ['darwin', 'win32'], label: 'Portable logs', maxDepth: 1,
+        patterns: [{ glob: '*.log', kind: 'log', viewer: 'jsonl', jsonlProfileId: 'portable-log-v1', label: 'Logs' }]
+      }],
+      jsonlProfiles: [{
+        id: 'portable-log-v1', timestampPaths: ['timestamp'], summaryPaths: ['message'],
+        tagRules: [{ path: 'level', fallback: 'raw-value' }]
+      }]
+    }
+
+    expect(() => validateAiToolPresets([portable])).not.toThrow()
+
+    const withProbeFields = (fields: Record<string, unknown>): AiToolPreset => ({
+      ...portable,
+      probes: [{ entryType: 'directory', ...fields }]
+    }) as AiToolPreset
+
+    expect(() => validateAiToolPresets([withProbeFields({ relativePath: '.portable', path: '${HOME}/.portable' })])).toThrow()
+    expect(() => validateAiToolPresets([withProbeFields({})])).toThrow()
+    expect(() => validateAiToolPresets([withProbeFields({ path: '${UNKNOWN}/.portable' })])).toThrow()
+    expect(() => validateAiToolPresets([withProbeFields({ path: '${HOME}/../escape' })])).toThrow()
+    expect(() => validateAiToolPresets([withProbeFields({ path: '${HOME}/wild*/portable' })])).toThrow()
+    expect(() => validateAiToolPresets([withProbeFields({ path: '${HOME}/portable/**/logs' })])).toThrow()
+    expect(() => validateAiToolPresets([withProbeFields({ path: '${HOME}/.portable', platforms: ['freebsd'] })])).toThrow()
+  })
+
   it('rejects executable callbacks in a declarative preset', () => {
     const preset = {
       id: 'callback-tool', displayName: 'Callback Tool', version: 1,

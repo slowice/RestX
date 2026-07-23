@@ -1,9 +1,12 @@
 import path from 'node:path'
 import type { AiToolPreset } from './types'
+import type { AiToolPathFields } from '../../../shared/contracts/ai-tool-preset'
 
 const VALID_KINDS = new Set(['config', 'instruction', 'conversation', 'history', 'log'])
 const VALID_VIEWERS = new Set(['config', 'jsonl', 'metadata'])
 const VALID_TONES = new Set(['neutral', 'user', 'assistant', 'thinking', 'tool', 'result', 'system', 'error'])
+const VALID_PLATFORMS = new Set<NodeJS.Platform>(['darwin', 'win32', 'linux'])
+const SUPPORTED_PATH_VARIABLES = new Set(['HOME', 'TEMP'])
 const SENSITIVE_PATH = /(?:^|[._/-])(auth|credentials?|secrets?|tokens?|keychain|private[-_]?keys?)(?:[._/-]|$)/i
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -30,6 +33,34 @@ function assertKeys(value: Record<string, unknown>, allowed: readonly string[], 
 
 function assertShortString(value: unknown, label: string, max = 200): asserts value is string {
   if (typeof value !== 'string' || !value.trim() || value.length > max || value.includes('\0')) throw new Error(`${label} 无效`)
+}
+
+function assertPathFields(
+  value: Record<string, unknown>,
+  label: string
+): asserts value is Record<string, unknown> & AiToolPathFields {
+  const hasRelativePath = value.relativePath !== undefined
+  const hasPath = value.path !== undefined
+  if (hasRelativePath === hasPath) throw new Error(`${label} 必须且只能指定 relativePath 或 path`)
+
+  if (hasRelativePath) {
+    if (typeof value.relativePath !== 'string' || !isSafeRelativePath(value.relativePath)) throw new Error(`${label} 路径无效：${String(value.relativePath)}`)
+  } else {
+    if (typeof value.path !== 'string' || !value.path.trim() || value.path.length > 1_000 || value.path.includes('\0')) throw new Error(`${label} 路径无效：${String(value.path)}`)
+    const variables = [...value.path.matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g)].map((match) => match[1])
+    if (variables.some((variable) => !SUPPORTED_PATH_VARIABLES.has(variable))) throw new Error(`${label} 路径包含不支持的变量`)
+    const beginsWithVariable = /^\$\{(HOME|TEMP)\}(?:[\\/]|$)/.test(value.path)
+    const isAbsoluteLiteral = path.isAbsolute(value.path) || /^[A-Za-z]:[\\/]/.test(value.path) || value.path.startsWith('\\\\')
+    if (!beginsWithVariable && !isAbsoluteLiteral) throw new Error(`${label} 路径必须以受支持变量或绝对路径开头`)
+    const segments = value.path.split(/[\\/]+/)
+    if (segments.includes('..') || value.path.includes('**') || segments.slice(0, -1).some((segment) => segment.includes('*'))) throw new Error(`${label} 路径无效：${value.path}`)
+  }
+
+  if (value.platforms !== undefined) {
+    if (!Array.isArray(value.platforms) || value.platforms.length === 0 || value.platforms.length > VALID_PLATFORMS.size || new Set(value.platforms).size !== value.platforms.length || value.platforms.some((platform) => typeof platform !== 'string' || !VALID_PLATFORMS.has(platform as NodeJS.Platform))) {
+      throw new Error(`${label} 平台无效`)
+    }
+  }
 }
 
 export function validateAiToolPresets(presets: readonly AiToolPreset[]): void {
@@ -97,21 +128,26 @@ export function validateAiToolPresets(presets: readonly AiToolPreset[]): void {
     const sourceIds = new Set<string>()
     for (const probe of preset.probes) {
       if (!isRecord(probe)) throw new Error(`AI 工具探针无效：${preset.id}`)
-      assertKeys(probe, ['relativePath', 'entryType'], 'AI 工具探针')
-      if (typeof probe.relativePath !== 'string' || !isSafeRelativePath(probe.relativePath)) throw new Error(`AI 工具探针路径无效：${String(probe.relativePath)}`)
-      if (SENSITIVE_PATH.test(probe.relativePath)) throw new Error(`AI 工具探针不能指向敏感路径：${probe.relativePath}`)
+      assertKeys(probe, ['relativePath', 'path', 'platforms', 'entryType'], 'AI 工具探针')
+      assertPathFields(probe, 'AI 工具探针')
+      const probePath = probe.relativePath ?? probe.path
+      if (typeof probePath !== 'string') throw new Error(`AI 工具探针路径无效：${preset.id}`)
+      if (SENSITIVE_PATH.test(probePath)) throw new Error(`AI 工具探针不能指向敏感路径：${probePath}`)
       if (probe.entryType !== 'file' && probe.entryType !== 'directory') throw new Error(`AI 工具探针类型无效：${preset.id}`)
     }
     let ruleCount = 0
     for (const source of preset.sources) {
       if (!isRecord(source)) throw new Error(`AI 工具来源无效：${preset.id}`)
-      assertKeys(source, ['id', 'relativePath', 'label', 'patterns', 'excludes', 'maxDepth'], 'AI 工具来源')
+      assertKeys(source, ['id', 'relativePath', 'path', 'platforms', 'label', 'patterns', 'excludes', 'maxDepth'], 'AI 工具来源')
       assertShortString(source.id, 'AI 工具来源 id', 100)
       if (sourceIds.has(source.id)) throw new Error(`AI 工具来源 id 重复：${preset.id}/${source.id}`)
       sourceIds.add(source.id)
       assertShortString(source.label, 'AI 工具来源名称')
-      if (typeof source.relativePath !== 'string' || !isSafeRelativePath(source.relativePath) || typeof source.maxDepth !== 'number' || !Number.isInteger(source.maxDepth) || source.maxDepth < 0 || source.maxDepth > 12) throw new Error(`AI 工具来源无效：${preset.id}/${source.id}`)
-      if (SENSITIVE_PATH.test(source.relativePath)) throw new Error(`AI 工具来源不能指向敏感路径：${preset.id}/${source.id}`)
+      assertPathFields(source, 'AI 工具来源')
+      const sourcePath = source.relativePath ?? source.path
+      if (typeof sourcePath !== 'string') throw new Error(`AI 工具来源路径无效：${preset.id}/${source.id}`)
+      if (typeof source.maxDepth !== 'number' || !Number.isInteger(source.maxDepth) || source.maxDepth < 0 || source.maxDepth > 12) throw new Error(`AI 工具来源无效：${preset.id}/${source.id}`)
+      if (SENSITIVE_PATH.test(sourcePath)) throw new Error(`AI 工具来源不能指向敏感路径：${preset.id}/${source.id}`)
       if (!Array.isArray(source.patterns) || source.patterns.length === 0) throw new Error(`AI 工具来源没有匹配规则：${preset.id}/${source.id}`)
       ruleCount += source.patterns.length
       if (ruleCount > 80) throw new Error(`AI 工具匹配规则过多：${preset.id}`)

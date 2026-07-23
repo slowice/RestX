@@ -1,8 +1,13 @@
 import type { CandidateKind, CandidateViewer } from './inspector'
 import type { JsonlTagTone } from './jsonl'
 
-export type AiToolProbe = {
-  relativePath: string
+export type AiToolPathFields = {
+  relativePath?: string
+  path?: string
+  platforms?: NodeJS.Platform[]
+}
+
+export type AiToolProbe = AiToolPathFields & {
   entryType: 'file' | 'directory'
 }
 
@@ -29,9 +34,8 @@ export type JsonlProfile = {
   tagRules: JsonlTagRule[]
 }
 
-export type AiToolSource = {
+export type AiToolSource = AiToolPathFields & {
   id: string
-  relativePath: string
   label: string
   patterns: AiToolMatchRule[]
   excludes?: string[]
