@@ -1,9 +1,15 @@
-import { afterEach, describe, expect, it } from 'vitest'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { classifyCandidate, scanDirectory, sortScanCandidates } from '../src/features/ai-inspector/main/services/file-scanner'
 import type { ScanCandidate } from '../src/features/ai-inspector/shared/contracts/inspector'
+import { AI_TOOL_PRESETS, setRegisteredAiToolPresets } from '../src/features/ai-inspector/main/presets/ai-tools'
+import type { AiToolPreset } from '../src/features/ai-inspector/main/presets/ai-tools'
+
+vi.mock('../src/features/ai-inspector/main/services/user-preset-store', () => ({
+  refreshAiToolPresetRegistry: vi.fn()
+}))
 
 const temporaryDirectories: string[] = []
 
@@ -15,6 +21,7 @@ async function makeFixture(): Promise<string> {
 
 afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
+  setRegisteredAiToolPresets(AI_TOOL_PRESETS)
 })
 
 describe('classifyCandidate', () => {
@@ -97,5 +104,32 @@ describe('scanDirectory', () => {
 
     expect(result.tools.find((tool) => tool.id === 'claude-code')).toMatchObject({ status: 'detected' })
     expect(result.candidates.map((candidate) => candidate.name)).toEqual(['settings.json'])
+  })
+
+  it('authorizes each detected external source root before returning the scan result', async () => {
+    const root = await makeFixture()
+    const externalHome = await makeFixture()
+    const externalSource = path.join(externalHome, 'nova-run')
+    await mkdir(path.join(externalHome, '.nova'))
+    await mkdir(externalSource)
+    await writeFile(path.join(externalSource, 'gateway.log'), 'started')
+    const preset: AiToolPreset = {
+      id: 'external-nova', displayName: 'External Nova', version: 1,
+      probes: [{ path: '${HOME}/.nova', entryType: 'directory' }],
+      sources: [{
+        id: 'logs', path: '${TEMP}/nova-*', label: 'Nova logs', maxDepth: 1,
+        patterns: [{ glob: '*.log', kind: 'log', viewer: 'metadata', label: 'Log' }]
+      }]
+    }
+    setRegisteredAiToolPresets([preset])
+    const authorized: string[] = []
+
+    const result = await scanDirectory(root, {}, {
+      pathEnvironment: { homeDirectory: externalHome, tempDirectory: externalHome, platform: process.platform },
+      authorizeRoot: async (directory) => { authorized.push(directory) }
+    })
+
+    expect(authorized).toEqual([await realpath(externalSource)])
+    expect(result.candidates).toMatchObject([{ name: 'gateway.log', kind: 'log' }])
   })
 })

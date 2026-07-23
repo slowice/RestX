@@ -1,4 +1,4 @@
-import { lstat, readdir } from 'node:fs/promises'
+import { lstat, readdir, realpath } from 'node:fs/promises'
 import path from 'node:path'
 import type {
   CandidateKind,
@@ -11,6 +11,7 @@ import type {
 import { AI_TOOL_PRESETS, type AiToolMatchRule, type AiToolPreset, type AiToolSource } from '../presets/ai-tools'
 import { validateAiToolPresets } from '../presets/ai-tools/validator'
 import { readJsonlSessionSummary } from './jsonl-browser'
+import { resolvePresetPaths, type PresetPathEnvironment } from './preset-path-resolver'
 
 export { validateAiToolPresets } from '../presets/ai-tools/validator'
 
@@ -24,6 +25,7 @@ export type ToolDiscoveryResult = {
   candidates: ScanCandidate[]
   skipped: SkippedEntry[]
   scannedFileCount: number
+  authorizationRoots: string[]
 }
 
 const KIND_NAMES: Record<CandidateKind, string> = {
@@ -42,22 +44,9 @@ function normalizedRelative(value: string): string {
   return value.split(path.sep).join('/')
 }
 
-function isSafeRelativePath(value: string): boolean {
-  if (!value || value.includes('\0') || path.isAbsolute(value)) return false
-  const normalized = path.normalize(value)
-  return normalized !== '..' && !normalized.startsWith(`..${path.sep}`)
-}
-
-function resolveWithin(rootPath: string, relativePath: string): string {
-  if (!isSafeRelativePath(relativePath)) throw new Error(`预置路径不安全：${relativePath}`)
-  const resolved = path.resolve(rootPath, relativePath)
-  const relative = path.relative(rootPath, resolved)
-  if (relative.startsWith('..') || path.isAbsolute(relative)) throw new Error(`预置路径越过扫描目录：${relativePath}`)
-  return resolved
-}
-
-function hasRelativePath<T extends { relativePath?: string }>(value: T): value is T & { relativePath: string } {
-  return typeof value.relativePath === 'string'
+function isOutsideRoot(rootPath: string, candidatePath: string): boolean {
+  const relative = path.relative(rootPath, candidatePath)
+  return relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)
 }
 
 function globToRegExp(glob: string): RegExp {
@@ -91,22 +80,27 @@ function pushSkipped(skipped: SkippedEntry[], entry: SkippedEntry): void {
   if (skipped.length < 200) skipped.push(entry)
 }
 
-async function detectPreset(rootPath: string, preset: AiToolPreset, skipped: SkippedEntry[]): Promise<DetectedAiTool['evidence']> {
+async function detectPreset(
+  rootPath: string,
+  preset: AiToolPreset,
+  skipped: SkippedEntry[],
+  pathEnvironment?: PresetPathEnvironment
+): Promise<DetectedAiTool['evidence']> {
   const evidence: DetectedAiTool['evidence'] = []
   for (const probe of preset.probes) {
-    if (!hasRelativePath(probe)) continue
-    const probePath = resolveWithin(rootPath, probe.relativePath)
-    try {
-      const stat = await lstat(probePath)
-      if (stat.isSymbolicLink()) {
-        pushSkipped(skipped, { path: probePath, reason: `${preset.displayName} 探针是符号链接` })
-        continue
+    for (const probePath of await resolvePresetPaths(rootPath, probe, pathEnvironment)) {
+      try {
+        const stat = await lstat(probePath)
+        if (stat.isSymbolicLink()) {
+          pushSkipped(skipped, { path: probePath, reason: `${preset.displayName} 探针是符号链接` })
+          continue
+        }
+        const matches = probe.entryType === 'directory' ? stat.isDirectory() : stat.isFile()
+        if (matches) evidence.push({ path: probePath, entryType: probe.entryType })
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code
+        if (code === 'EACCES' || code === 'EPERM') pushSkipped(skipped, { path: probePath, reason: `${preset.displayName} 探针无读取权限` })
       }
-      const matches = probe.entryType === 'directory' ? stat.isDirectory() : stat.isFile()
-      if (matches) evidence.push({ path: probePath, entryType: probe.entryType })
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code
-      if (code === 'EACCES' || code === 'EPERM') pushSkipped(skipped, { path: probePath, reason: `${preset.displayName} 探针无读取权限` })
     }
   }
   return evidence
@@ -197,16 +191,18 @@ async function enrichConversationSessions(candidates: ScanCandidate[], skipped: 
 export async function discoverAiTools(
   rootPath: string,
   options: ToolDiscoveryOptions,
-  presets: readonly AiToolPreset[] = AI_TOOL_PRESETS
+  presets: readonly AiToolPreset[] = AI_TOOL_PRESETS,
+  pathEnvironment?: PresetPathEnvironment
 ): Promise<ToolDiscoveryResult> {
   validateAiToolPresets(presets)
   const skipped: SkippedEntry[] = []
   const detected = await Promise.all(presets.map(async (preset) => ({
     preset,
-    evidence: await detectPreset(rootPath, preset, skipped)
+    evidence: await detectPreset(rootPath, preset, skipped, pathEnvironment)
   })))
   const candidates: ScanCandidate[] = []
   const candidatePaths = new Set<string>()
+  const authorizationRoots = new Set<string>()
   let scannedFileCount = 0
   let limitReached = false
 
@@ -245,7 +241,13 @@ export async function discoverAiTools(
     }
   }
 
-  async function walkSource(directory: string, depth: number, preset: AiToolPreset, source: AiToolSource & { relativePath: string }): Promise<void> {
+  async function walkSource(
+    directory: string,
+    sourceRoot: string,
+    depth: number,
+    preset: AiToolPreset,
+    source: AiToolSource
+  ): Promise<void> {
     if (limitReached || depth > source.maxDepth) return
     let entries
     try {
@@ -258,12 +260,12 @@ export async function discoverAiTools(
     for (const entry of entries) {
       if (limitReached) return
       const entryPath = path.join(directory, entry.name)
-      const relativePath = normalizedRelative(path.relative(resolveWithin(rootPath, source.relativePath), entryPath))
+      const relativePath = normalizedRelative(path.relative(sourceRoot, entryPath))
       if (excludedBy(source, relativePath)) continue
       if (entry.isSymbolicLink()) {
         pushSkipped(skipped, { path: entryPath, reason: '跳过符号链接' })
       } else if (entry.isDirectory()) {
-        await walkSource(entryPath, depth + 1, preset, source)
+        await walkSource(entryPath, sourceRoot, depth + 1, preset, source)
       } else if (entry.isFile()) {
         await addFile(entryPath, relativePath, preset, source)
       }
@@ -274,20 +276,26 @@ export async function discoverAiTools(
     if (item.evidence.length === 0) continue
     for (const source of item.preset.sources) {
       if (limitReached) break
-      if (!hasRelativePath(source)) continue
-      const sourcePath = resolveWithin(rootPath, source.relativePath)
-      try {
-        const stat = await lstat(sourcePath)
-        if (stat.isSymbolicLink()) {
-          pushSkipped(skipped, { path: sourcePath, reason: '跳过符号链接来源' })
-        } else if (stat.isFile()) {
-          await addFile(sourcePath, path.basename(sourcePath), item.preset, source)
-        } else if (stat.isDirectory()) {
-          await walkSource(sourcePath, 0, item.preset, source)
+      for (const sourcePath of await resolvePresetPaths(rootPath, source, pathEnvironment)) {
+        if (limitReached) break
+        try {
+          const stat = await lstat(sourcePath)
+          if (stat.isSymbolicLink()) {
+            pushSkipped(skipped, { path: sourcePath, reason: '跳过符号链接来源' })
+            continue
+          }
+          const sourceRealPath = await realpath(sourcePath)
+          const authorizationRoot = stat.isFile() ? path.dirname(sourceRealPath) : sourceRealPath
+          if (isOutsideRoot(rootPath, authorizationRoot)) authorizationRoots.add(authorizationRoot)
+          if (stat.isFile()) {
+            await addFile(sourceRealPath, path.basename(sourceRealPath), item.preset, source)
+          } else if (stat.isDirectory()) {
+            await walkSource(sourceRealPath, sourceRealPath, 0, item.preset, source)
+          }
+        } catch (error) {
+          const code = (error as NodeJS.ErrnoException).code
+          if (code === 'EACCES' || code === 'EPERM') pushSkipped(skipped, { path: sourcePath, reason: '无读取权限' })
         }
-      } catch (error) {
-        const code = (error as NodeJS.ErrnoException).code
-        if (code === 'EACCES' || code === 'EPERM') pushSkipped(skipped, { path: sourcePath, reason: '无读取权限' })
       }
     }
   }
@@ -317,5 +325,5 @@ export async function discoverAiTools(
     }
   })
 
-  return { tools, candidates, skipped, scannedFileCount }
+  return { tools, candidates, skipped, scannedFileCount, authorizationRoots: [...authorizationRoots] }
 }

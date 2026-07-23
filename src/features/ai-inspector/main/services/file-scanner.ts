@@ -4,6 +4,7 @@ import type { ScanCandidate, ScanOptions, ScanResult, SkippedEntry } from '../..
 import { discoverAiTools } from './ai-tool-discovery'
 import { getRegisteredAiToolPresets } from '../presets/ai-tools'
 import { refreshAiToolPresetRegistry } from './user-preset-store'
+import type { PresetPathEnvironment } from './preset-path-resolver'
 
 const DEFAULTS = {
   maxDepth: 8,
@@ -19,6 +20,11 @@ const CONFIG_EXTENSIONS = new Set(['.json', '.yaml', '.yml', '.toml', '.ini'])
 const LOG_EXTENSIONS = new Set(['.log', '.out', '.err'])
 const TEXT_EXTENSIONS = new Set(['.txt', '.log', '.out', '.err', '.json', '.yaml', '.yml', '.toml', '.ini', '.md'])
 const LIKELY_CONFIG_NAME = /(?:^|[._-])(config|settings?|preferences?|profile|mcp|claude|codex|cursor|openai|anthropic|restx|ai)(?:[._-]|$)/i
+
+export type ScanDependencies = {
+  authorizeRoot?: (directory: string) => Promise<unknown>
+  pathEnvironment?: PresetPathEnvironment
+}
 
 export class ScanError extends Error {
   constructor(message: string, readonly code: string) {
@@ -73,7 +79,11 @@ export function sortScanCandidates(candidates: ScanCandidate[], rootPath: string
   })
 }
 
-export async function scanDirectory(inputPath: string, options: ScanOptions = {}): Promise<ScanResult> {
+export async function scanDirectory(
+  inputPath: string,
+  options: ScanOptions = {},
+  dependencies: ScanDependencies = {}
+): Promise<ScanResult> {
   const startedAt = new Date().toISOString()
   const limits = { ...DEFAULTS, ...options }
   const normalizedInput = path.resolve(inputPath)
@@ -92,7 +102,8 @@ export async function scanDirectory(inputPath: string, options: ScanOptions = {}
   }
 
   await refreshAiToolPresetRegistry()
-  const discovery = await discoverAiTools(rootPath, limits, getRegisteredAiToolPresets())
+  const discovery = await discoverAiTools(rootPath, limits, getRegisteredAiToolPresets(), dependencies.pathEnvironment)
+  for (const authorizationRoot of discovery.authorizationRoots) await dependencies.authorizeRoot?.(authorizationRoot)
   const candidates: ScanCandidate[] = [...discovery.candidates]
   const skipped: SkippedEntry[] = [...discovery.skipped]
   let scannedFileCount = discovery.scannedFileCount

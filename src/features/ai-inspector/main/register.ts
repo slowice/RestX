@@ -112,7 +112,9 @@ export const aiInspectorMainFeature = defineMainFeature({
   ipc.handle(aiInspectorChannels.scanDirectory, async (_event, directory: unknown) => {
     assertString(directory, 'directory')
     const normalized = await authorizedPaths.assertAuthorized(directory)
-    return scanDirectory(normalized)
+    return scanDirectory(normalized, {}, {
+      authorizeRoot: (directory) => authorizedPaths.authorize(directory)
+    })
   })
 
   ipc.handle(aiInspectorChannels.readConfig, async (_event, filePath: unknown) => {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { discoverAiTools, validateAiToolPresets } from '../src/features/ai-inspector/main/services/ai-tool-discovery'
@@ -142,22 +142,40 @@ describe('AI tool discovery framework', () => {
     expect(() => validateAiToolPresets([withProbeFields({ path: '${HOME}/.openclaw' })])).not.toThrow()
   })
 
-  it('skips unresolved portable paths while discovery remains root-bound', async () => {
+  it('discovers detected tools from resolved external sources and returns their authorization roots', async () => {
     const root = await makeFixture()
-    await mkdir(path.join(root, '.local'))
-    const preset: AiToolPreset = {
+    const externalHome = await makeFixture()
+    const externalSource = path.join(externalHome, 'nova-run')
+    await mkdir(path.join(externalHome, '.nova'))
+    await mkdir(externalSource)
+    await writeFile(path.join(externalSource, 'gateway.log'), 'started')
+    const environment = {
+      homeDirectory: externalHome,
+      tempDirectory: externalHome,
+      platform: process.platform
+    }
+    const detectedPreset: AiToolPreset = {
       id: 'portable-source', displayName: 'Portable Source', version: 1,
-      probes: [{ relativePath: '.local', entryType: 'directory' }],
+      probes: [{ path: '${HOME}/.nova', entryType: 'directory' }],
       sources: [{
-        id: 'portable', path: '${UID}/.openclaw', label: 'Portable files', maxDepth: 1,
-        patterns: [{ glob: '*.json', kind: 'config', viewer: 'config', label: 'Config' }]
+        id: 'portable', path: '${TEMP}/nova-*', label: 'Portable files', maxDepth: 1,
+        patterns: [{ glob: '*.log', kind: 'log', viewer: 'metadata', label: 'Log' }]
       }]
     }
+    const undetectedPreset: AiToolPreset = {
+      ...detectedPreset,
+      id: 'undetected-portable-source',
+      probes: [{ path: '${HOME}/.missing-nova', entryType: 'directory' }]
+    }
 
-    const result = await discoverAiTools(root, limits, [preset])
+    const result = await discoverAiTools(root, limits, [detectedPreset], environment)
+    const undetectedResult = await discoverAiTools(root, limits, [undetectedPreset], environment)
 
     expect(result.tools[0]).toMatchObject({ id: 'portable-source', status: 'detected' })
-    expect(result.candidates).toEqual([])
+    const externalRealPath = await realpath(externalSource)
+    expect(result.candidates).toMatchObject([{ name: 'gateway.log', path: path.join(externalRealPath, 'gateway.log'), kind: 'log' }])
+    expect(result.authorizationRoots).toEqual([externalRealPath])
+    expect(undetectedResult.authorizationRoots).toEqual([])
   })
 
   it('rejects executable callbacks in a declarative preset', () => {
