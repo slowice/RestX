@@ -81,7 +81,8 @@ function makeApi(): RestXApi {
       analyzeConfig: vi.fn(), getCachedAnalysis: vi.fn(async (): Promise<CachedAnalysisResponse> => ({ status: 'none', record: null })), clearAnalysisCache: vi.fn()
     },
     presets: { list: vi.fn(async () => []), generateDraft: vi.fn(), save: vi.fn(), setEnabled: vi.fn(), delete: vi.fn() },
-    codeReview: { listMyGitCodeMergeRequests: vi.fn(), previewSource: vi.fn(), run: vi.fn(), getGitCodeSettings: vi.fn(), updateGitCodeSettings: vi.fn(), testGitCodeConnection: vi.fn(), clearCache: vi.fn() }
+    codeReview: { listMyGitCodeMergeRequests: vi.fn(), previewSource: vi.fn(), run: vi.fn(), getGitCodeSettings: vi.fn(), updateGitCodeSettings: vi.fn(), testGitCodeConnection: vi.fn(), clearCache: vi.fn() },
+    mailTemplates: { openDraft: vi.fn(async () => undefined), importMessage: vi.fn(async () => null) }
   }
 }
 
