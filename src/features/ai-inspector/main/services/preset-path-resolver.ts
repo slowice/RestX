@@ -44,23 +44,30 @@ function terminalWildcardPattern(value: string): RegExp {
   return new RegExp(`^${value.split('*').map((segment) => segment.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')).join('.*')}$`, 'i')
 }
 
-function trustedTemplateBase(template: string, resolvedTemplate: string, environment: PresetPathEnvironment): string {
-  const variable = template.match(/^\$\{(HOME|TEMP|UID)\}(?:[\\/]|$)/)?.[1]
-  if (variable === 'HOME') return path.resolve(environment.homeDirectory)
-  if (variable === 'TEMP') return path.resolve(environment.tempDirectory)
-  if (variable === 'UID' && environment.uid) return path.resolve(environment.uid)
-  return path.parse(resolvedTemplate).root
+type WildcardTrustBoundary = {
+  path: string
+  skipFirstFixedParent: boolean
 }
 
-async function hasSafeWildcardParent(parentPath: string, trustedBase: string): Promise<boolean> {
+function trustedTemplateBase(template: string, resolvedTemplate: string, environment: PresetPathEnvironment): WildcardTrustBoundary {
+  const variable = template.match(/^\$\{(HOME|TEMP|UID)\}(?:[\\/]|$)/)?.[1]
+  if (variable === 'HOME') return { path: path.resolve(environment.homeDirectory), skipFirstFixedParent: false }
+  if (variable === 'TEMP') return { path: path.resolve(environment.tempDirectory), skipFirstFixedParent: false }
+  if (variable === 'UID' && environment.uid) return { path: path.resolve(environment.uid), skipFirstFixedParent: false }
+  return { path: path.parse(resolvedTemplate).root, skipFirstFixedParent: true }
+}
+
+async function hasSafeWildcardParent(parentPath: string, boundary: WildcardTrustBoundary): Promise<boolean> {
+  const trustedBase = boundary.path
   const relativeParent = path.relative(trustedBase, parentPath)
   if (relativeParent === '') return true
   if (relativeParent === '..' || relativeParent.startsWith(`..${path.sep}`) || path.isAbsolute(relativeParent)) return false
 
   let currentPath = trustedBase
   try {
-    for (const segment of relativeParent.split(path.sep)) {
+    for (const [index, segment] of relativeParent.split(path.sep).entries()) {
       currentPath = path.join(currentPath, segment)
+      if (boundary.skipFirstFixedParent && index === 0) continue
       if ((await lstat(currentPath)).isSymbolicLink()) return false
     }
     return true
@@ -70,13 +77,13 @@ async function hasSafeWildcardParent(parentPath: string, trustedBase: string): P
   }
 }
 
-async function resolveTerminalWildcard(resolvedTemplate: string, trustedBase: string): Promise<string[]> {
+async function resolveTerminalWildcard(resolvedTemplate: string, boundary: WildcardTrustBoundary): Promise<string[]> {
   const parentPath = path.dirname(resolvedTemplate)
   const basenamePattern = path.basename(resolvedTemplate)
   if (!basenamePattern.includes('*')) return []
 
   try {
-    if (!await hasSafeWildcardParent(parentPath, trustedBase)) return []
+    if (!await hasSafeWildcardParent(parentPath, boundary)) return []
     const matcher = terminalWildcardPattern(basenamePattern)
     const children = await readdir(parentPath, { withFileTypes: true })
     const locations = await Promise.all(children

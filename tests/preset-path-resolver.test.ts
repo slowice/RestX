@@ -103,6 +103,17 @@ describe('preset path resolver', () => {
     })).resolves.toEqual([])
   })
 
+  it('resolves literal /tmp wildcard paths through the macOS tmp alias', async () => {
+    const root = await makeFixture()
+    const temp = await mkdtemp('/tmp/restx-literal-preset-paths-')
+    temporaryDirectories.push(temp)
+    await writeFile(path.join(temp, 'openclaw-log'), '')
+
+    await expect(resolvePresetPaths(root, { path: `${temp}/openclaw-*` }, {
+      homeDirectory: root, tempDirectory: root, platform: 'darwin'
+    })).resolves.toEqual([await realpath(path.join(temp, 'openclaw-log'))])
+  })
+
   it('keeps exact relative paths inside the supplied root', async () => {
     const root = await makeFixture()
     await mkdir(path.join(root, '.openclaw'))
