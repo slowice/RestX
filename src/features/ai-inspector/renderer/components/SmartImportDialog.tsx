@@ -107,7 +107,7 @@ function ImportedPresetList({ presets, onToggle, onDelete }: {
 }): React.JSX.Element {
   return (
     <section className="imported-presets">
-      <div className="imported-heading"><div><strong>已导入预置</strong><span>保存在 ~/.RestX/presets/</span></div><b>{presets.filter((item) => item.valid).length}</b></div>
+      <div className="imported-heading"><div><strong>已导入预置</strong><span>保存在 ~/.restx/config/presets/</span></div><b>{presets.filter((item) => item.valid).length}</b></div>
       {presets.length === 0 ? <div className="imported-empty"><Bot size={20} />还没有用户预置</div> : presets.map((preset) => (
         <article key={preset.filePath} className={`imported-preset${preset.valid ? '' : ' invalid'}`}>
           <span className="imported-preset-icon"><FileJson2 size={16} /></span>

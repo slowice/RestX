@@ -209,7 +209,7 @@ describe('Inspector tool folder browser', () => {
       }
     }
     api.presets.generateDraft = vi.fn(async () => draft)
-    api.presets.save = vi.fn(async (): Promise<UserPresetSummary> => ({ id: 'nova', displayName: 'Nova', enabled: true, valid: true, format: 'json', filePath: '/Users/demo/.RestX/presets/nova.json', error: null }))
+    api.presets.save = vi.fn(async (): Promise<UserPresetSummary> => ({ id: 'nova', displayName: 'Nova', enabled: true, valid: true, format: 'json', filePath: '/Users/demo/.restx/config/presets/nova.json', error: null }))
     Object.defineProperty(window, 'restx', { configurable: true, value: api })
     render(<MemoryRouter><InspectorStateProvider><InspectorPage /></InspectorStateProvider></MemoryRouter>)
 

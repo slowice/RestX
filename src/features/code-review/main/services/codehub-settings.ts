@@ -1,5 +1,6 @@
 import { safeStorage } from 'electron'
 import Store from 'electron-store'
+import { getRestxStorageLayout } from '../../../../platform/main/storage'
 import type { CodeHubPublicSettings, CodeHubSettingsInput } from '../../shared/contracts/code-review'
 import { ReviewSourceError } from './code-review-source'
 import type { ProviderSettingsStorage, SecretCrypto } from './gitcode-settings'
@@ -42,7 +43,7 @@ let instance: CodeHubSettingsManager | null = null
 
 function getManager(): CodeHubSettingsManager {
   if (instance) return instance
-  const store = new Store<CodeHubStoreShape>({ name: 'codehub-settings' })
+  const store = new Store<CodeHubStoreShape>({ name: 'codehub-settings', cwd: getRestxStorageLayout().config })
   const crypto: SecretCrypto = {
     isAvailable: () => safeStorage.isEncryptionAvailable(),
     encrypt: (value) => safeStorage.encryptString(value).toString('base64'),

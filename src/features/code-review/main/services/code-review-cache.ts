@@ -1,5 +1,6 @@
 import { safeStorage } from 'electron'
 import Store from 'electron-store'
+import { getRestxStorageLayout } from '../../../../platform/main/storage'
 import type { CodeReviewResult, MergeRequestReviewState } from '../../shared/contracts/code-review'
 
 const TTL_MS = 7 * 24 * 60 * 60 * 1000
@@ -111,7 +112,7 @@ export class CodeReviewCache {
 let cache: CodeReviewCache | null = null
 export function getCodeReviewCache(): CodeReviewCache {
   if (cache) return cache
-  const store = new Store<{ records: Record<string, StoredRecord> }>({ name: 'code-review-cache', defaults: { records: {} } })
+  const store = new Store<{ records: Record<string, StoredRecord> }>({ name: 'code-review-cache', cwd: getRestxStorageLayout().cache, defaults: { records: {} } })
   const crypto: ReviewCacheCrypto = {
     isAvailable: () => safeStorage.isEncryptionAvailable(),
     encrypt: (value) => safeStorage.encryptString(value).toString('base64'),

@@ -1,6 +1,6 @@
-import { app } from 'electron'
 import { appendFile, mkdir } from 'node:fs/promises'
 import path from 'node:path'
+import { getRestxStorageLayout } from '../../../../platform/main/storage'
 
 export type ReviewAuditEvent = {
   timestamp: string
@@ -17,7 +17,7 @@ export type ReviewAuditEvent = {
 
 export async function writeReviewAudit(event: ReviewAuditEvent): Promise<void> {
   try {
-    const directory = path.join(app.getPath('home'), '.RestX', 'log')
+    const directory = getRestxStorageLayout().logs
     await mkdir(directory, { recursive: true, mode: 0o700 })
     await appendFile(path.join(directory, `code-review-${event.timestamp.slice(0, 10)}.jsonl`), `${JSON.stringify(event)}\n`, { encoding: 'utf8', mode: 0o600 })
   } catch {

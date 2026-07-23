@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
 import path from 'node:path'
+import { getRestxStorageLayout } from '../../../../platform/main/storage'
 import { parse as parseYaml } from 'yaml'
 import type { AiToolPreset } from '../../shared/contracts/ai-tool-preset'
 import type { UserPresetSummary } from '../../shared/contracts/smart-import'
@@ -11,7 +11,7 @@ import { parseAiToolPreset, validateAiToolPresets } from '../presets/ai-tools/va
 type PresetState = { disabled: string[] }
 type LoadedUserPresets = { presets: AiToolPreset[]; summaries: UserPresetSummary[] }
 
-export const USER_PRESET_DIRECTORY = path.join(homedir(), '.RestX', 'presets')
+export const USER_PRESET_DIRECTORY = getRestxStorageLayout().presets
 const STATE_FILE = 'state.json'
 
 function errorText(error: unknown): string {

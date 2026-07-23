@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron'
+import { mkdirSync } from 'node:fs'
 import path from 'node:path'
-import { registerApplication } from '../platform/main/register-platform'
+import { createRestxStorageLayout, initializeRestxStorage } from '../platform/main/storage'
 
 const applicationName = 'RestX'
 const developmentIcon = process.env.ELECTRON_RENDERER_URL
@@ -8,6 +9,10 @@ const developmentIcon = process.env.ELECTRON_RENDERER_URL
   : undefined
 
 app.setName(applicationName)
+const legacyUserData = app.getPath('userData')
+const storageLayout = createRestxStorageLayout()
+mkdirSync(storageLayout.runtime, { recursive: true, mode: 0o700 })
+app.setPath('userData', storageLayout.runtime)
 
 let disposeApplication: (() => void) | null = null
 
@@ -40,6 +45,8 @@ app.whenReady().then(async () => {
   if (process.platform === 'win32') app.setAppUserModelId('com.restx.desktop')
   if (process.platform === 'darwin' && developmentIcon) app.dock?.setIcon(developmentIcon)
 
+  await initializeRestxStorage({ legacyUserData })
+  const { registerApplication } = await import('../platform/main/register-platform')
   disposeApplication = await registerApplication()
   createWindow()
   app.on('activate', () => {

@@ -1,5 +1,6 @@
 import { safeStorage } from 'electron'
 import Store from 'electron-store'
+import { getRestxStorageLayout } from '../../../../platform/main/storage'
 import type { GitCodePublicSettings, GitCodeSettingsInput } from '../../shared/contracts/code-review'
 import { GITCODE_API_BASE_URL } from './gitcode-adapter'
 import { ReviewSourceError } from './code-review-source'
@@ -54,7 +55,7 @@ let instance: GitCodeSettingsManager | null = null
 
 function getManager(): GitCodeSettingsManager {
   if (instance) return instance
-  const store = new Store<GitCodeStoreShape>({ name: 'gitcode-settings' })
+  const store = new Store<GitCodeStoreShape>({ name: 'gitcode-settings', cwd: getRestxStorageLayout().config })
   const crypto: SecretCrypto = {
     isAvailable: () => safeStorage.isEncryptionAvailable(),
     encrypt: (value) => safeStorage.encryptString(value).toString('base64'),
