@@ -84,18 +84,43 @@ function extractMessageContent(envelope: unknown): string {
   return content
 }
 
-function parseJsonContent(content: string): RawClassification {
-  const candidate = content.trim()
-    .replace(/^\s*<think>[\s\S]*?<\/think>\s*/i, '')
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```\s*$/i, '')
-  try {
-    const value: unknown = JSON.parse(candidate)
-    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('not-object')
-    return value as RawClassification
-  } catch {
-    throw new KnowledgeClassificationError('AI 没有返回可读取的 JSON 分类结果。', 'INVALID_RESPONSE')
+function firstJsonObject(value: string): string | null {
+  const start = value.indexOf('{')
+  if (start < 0) return null
+  let depth = 0
+  let quoted = false
+  let escaped = false
+  for (let index = start; index < value.length; index += 1) {
+    const character = value[index]!
+    if (quoted) {
+      if (escaped) escaped = false
+      else if (character === '\\') escaped = true
+      else if (character === '"') quoted = false
+      continue
+    }
+    if (character === '"') quoted = true
+    else if (character === '{') depth += 1
+    else if (character === '}') {
+      depth -= 1
+      if (depth === 0) return value.slice(start, index + 1)
+    }
   }
+  return null
+}
+
+function parseJsonContent(content: string): RawClassification {
+  const normalized = content.trim().replace(/^\s*<think>[\s\S]*?<\/think>\s*/i, '')
+  const fenced = normalized.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)?.[1]
+  const candidates = [normalized, fenced, firstJsonObject(normalized)].filter((value): value is string => Boolean(value))
+  for (const candidate of candidates) {
+    try {
+      const value: unknown = JSON.parse(candidate.trim())
+      if (value && typeof value === 'object' && !Array.isArray(value)) return value as RawClassification
+    } catch {
+      // Try the next bounded JSON candidate from the model response.
+    }
+  }
+  throw new KnowledgeClassificationError('AI 没有返回可读取的 JSON 分类结果。', 'INVALID_RESPONSE')
 }
 
 export async function classifyKnowledgeProblem({
@@ -168,4 +193,3 @@ export async function classifyKnowledgeProblem({
   const normalized = normalizeClassificationSuggestion(parseJsonContent(extractMessageContent(envelope)), catalog)
   return { problemId, sourceFingerprint, ...normalized }
 }
-

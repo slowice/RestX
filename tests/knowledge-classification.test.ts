@@ -74,6 +74,23 @@ describe('knowledge problem classification', () => {
     expect(request.messages[1]?.content).not.toContain('secret')
   })
 
+  test('accepts a JSON classification wrapped in a model explanation', async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{ message: { content: '整理结果如下：\n```json\n{"scene":"Knowledge Manager","capability":["Electron"],"knowledge":["IPC"]}\n```' } }]
+    }), { status: 200, headers: { 'content-type': 'application/json' } }))
+
+    const suggestion = await classifyKnowledgeProblem({
+      problemId: 'problem.md',
+      sourceFingerprint: 'fingerprint',
+      markdown: '# Cannot open file',
+      catalog: { scenes: ['Knowledge Manager'], capabilities: ['Electron'], knowledge: ['IPC'] },
+      provider,
+      fetchImpl
+    })
+
+    expect(suggestion.scene).toEqual({ value: 'Knowledge Manager', existing: true })
+  })
+
   test('rejects malformed or empty model labels', () => {
     expect(() => normalizeClassificationSuggestion(
       { scene: '', capability: [], knowledge: ['IPC'] },
