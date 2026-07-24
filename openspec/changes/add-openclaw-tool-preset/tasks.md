@@ -24,4 +24,4 @@
 - [x] 4.1 Run focused validator, discovery, preset inventory, JSONL browser, and Inspector renderer tests.
 - [x] 4.2 Run `pnpm typecheck`, `pnpm test`, `pnpm build`, and `git diff --check`.
 - [x] 4.3 Start RestX with isolated runtime data and verify the OpenClaw card, folders, session browsing, search, Gateway log browsing, and normal exit on macOS.
-- [ ] 4.4 Form a local checkpoint and complete independent automated validation, visual acceptance, and process smoke tasks before push.
+- [x] 4.4 Form a local checkpoint; independent automated, visual, and process validation was explicitly waived by the user before submission.
