@@ -15,7 +15,15 @@ type Props = {
 }
 
 function splitLabels(value: string): string[] {
-  return [...new Set(value.split(/[,\n，]+/).map((item) => item.trim()).filter(Boolean))]
+  return [...new Map(value
+    .split(/[,\n，]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => [item.toLocaleLowerCase(), item])).values()]
+}
+
+function isValidLabel(value: string): boolean {
+  return Boolean(value && value.length <= 80 && !/[\u0000-\u001f\u007f]/.test(value))
 }
 
 function LabelIndicators({ labels }: { labels: SuggestedLabel[] }): React.JSX.Element {
@@ -32,7 +40,14 @@ export function ClassificationDialog({ suggestion, applying, error, onCancel, on
   const [knowledge, setKnowledge] = useState(suggestion.knowledge.map((item) => item.value).join('\n'))
   const parsedCapabilities = splitLabels(capabilities)
   const parsedKnowledge = splitLabels(knowledge)
-  const valid = Boolean(scene.trim() && parsedCapabilities.length && parsedKnowledge.length)
+  const normalizedScene = scene.trim()
+  const valid = isValidLabel(normalizedScene)
+    && parsedCapabilities.length >= 1
+    && parsedCapabilities.length <= 8
+    && parsedCapabilities.every(isValidLabel)
+    && parsedKnowledge.length >= 1
+    && parsedKnowledge.length <= 8
+    && parsedKnowledge.every(isValidLabel)
   return (
     <div className="knowledge-dialog-backdrop">
       <section className="knowledge-dialog" role="dialog" aria-modal="true" aria-labelledby="knowledge-dialog-title">
@@ -57,7 +72,7 @@ export function ClassificationDialog({ suggestion, applying, error, onCancel, on
             onClick={() => onApply({
               problemId: suggestion.problemId,
               sourceFingerprint: suggestion.sourceFingerprint,
-              scene: scene.trim(),
+              scene: normalizedScene,
               capabilities: parsedCapabilities,
               knowledge: parsedKnowledge
             })}
@@ -69,4 +84,3 @@ export function ClassificationDialog({ suggestion, applying, error, onCancel, on
     </div>
   )
 }
-

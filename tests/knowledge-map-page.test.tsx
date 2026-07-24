@@ -119,6 +119,10 @@ describe('KnowledgeMapPage', () => {
     expect(await screen.findByRole('dialog', { name: '确认 AI 整理结果' })).toBeInTheDocument()
     expect(screen.getByText('复用已有')).toBeInTheDocument()
     expect(screen.getAllByText('新增').length).toBeGreaterThan(0)
+    fireEvent.change(screen.getByLabelText('能力标签'), {
+      target: { value: Array.from({ length: 9 }, (_, index) => `能力${index + 1}`).join('\n') }
+    })
+    expect(screen.getByRole('button', { name: '确认并写回' })).toBeDisabled()
     fireEvent.change(screen.getByLabelText('能力标签'), { target: { value: '知识建模\n信息架构' } })
     fireEvent.click(screen.getByRole('button', { name: '确认并写回' }))
 
