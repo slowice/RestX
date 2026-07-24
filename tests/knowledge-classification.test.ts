@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, test, vi } from 'vitest'
@@ -148,5 +148,27 @@ Keep this exact content.
         knowledge: ['IPC']
       }
     })).rejects.toMatchObject<Partial<KnowledgeWriteError>>({ code: 'INVALID_PROBLEM_ID' })
+  })
+
+  test('rejects writeback through a symbolic link outside the knowledge root', async () => {
+    const root = await createTemporaryRoot()
+    const outside = await createTemporaryRoot()
+    const outsidePath = path.join(outside, 'secret.md')
+    const original = '# Must stay outside'
+    await writeFile(outsidePath, original)
+    await symlink(outsidePath, path.join(root, 'problem.md'))
+    const parsed = parseKnowledgeMarkdown(original, 'problem.md')
+
+    await expect(applyKnowledgeClassification({
+      root,
+      input: {
+        problemId: 'problem.md',
+        sourceFingerprint: parsed.summary.sourceFingerprint,
+        scene: 'Knowledge Manager',
+        capabilities: ['Electron'],
+        knowledge: ['IPC']
+      }
+    })).rejects.toMatchObject<Partial<KnowledgeWriteError>>({ code: 'SOURCE_UNAVAILABLE' })
+    await expect(readFile(outsidePath, 'utf8')).resolves.toBe(original)
   })
 })

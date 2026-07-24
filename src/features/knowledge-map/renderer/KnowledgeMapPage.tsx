@@ -34,16 +34,17 @@ export function KnowledgeMapPage(): React.JSX.Element {
     try {
       const next = await window.restx.knowledge.scan()
       setResult(next)
-      if (selectedProblemId && !next.problems.some((problem) => problem.id === selectedProblemId)) {
-        setSelectedProblemId(null)
+      setSelectedProblemId((current) => {
+        if (!current || next.problems.some((problem) => problem.id === current)) return current
         setDetail(null)
-      }
+        return null
+      })
     } catch (reason) {
       setError(errorMessage(reason))
     } finally {
       setLoading(false)
     }
-  }, [selectedProblemId])
+  }, [])
 
   useEffect(() => { void refresh() }, [refresh])
 
@@ -174,4 +175,3 @@ export function KnowledgeMapPage(): React.JSX.Element {
     </div>
   )
 }
-

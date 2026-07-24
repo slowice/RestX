@@ -1,7 +1,11 @@
-import { copyFile, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
+import { mkdir, rename, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { Document } from 'yaml'
 import type { ApplyKnowledgeClassificationInput } from '../../shared/contracts'
+import {
+  KnowledgeFileAccessError,
+  readSafeKnowledgeFile
+} from './knowledge-file-access'
 import { parseKnowledgeMarkdown, type ParsedKnowledgeMarkdown } from './markdown-parser'
 
 export class KnowledgeWriteError extends Error {
@@ -61,8 +65,11 @@ export async function applyKnowledgeClassification({
   const knowledge = validateConfirmedList(input.knowledge, '知识')
   let original: string
   try {
-    original = await readFile(target, 'utf8')
-  } catch {
+    original = (await readSafeKnowledgeFile(root, target)).content
+  } catch (error) {
+    if (error instanceof KnowledgeFileAccessError && error.code === 'SOURCE_TOO_LARGE') {
+      throw new KnowledgeWriteError(error.message, error.code)
+    }
     throw new KnowledgeWriteError('问题文件已不存在或无法读取。', 'SOURCE_UNAVAILABLE')
   }
   const parsed = parseKnowledgeMarkdown(original, input.problemId)
@@ -86,13 +93,21 @@ export async function applyKnowledgeClassification({
   const backupPath = path.join(backupRoot, `${safeId}.${timestampName(now())}.bak.md`)
   const temporaryPath = `${target}.restx-${process.pid}-${Date.now()}.tmp`
   try {
-    await copyFile(target, backupPath)
+    const current = await readSafeKnowledgeFile(root, target)
+    const currentParsed = parseKnowledgeMarkdown(current.content, input.problemId)
+    if (currentParsed.summary.sourceFingerprint !== parsed.summary.sourceFingerprint) {
+      throw new KnowledgeWriteError('问题文件已发生变化，请重新整理。', 'SOURCE_CONFLICT')
+    }
+    await writeFile(backupPath, original, { encoding: 'utf8', mode: 0o600, flag: 'wx' })
     await writeFile(temporaryPath, updated, { encoding: 'utf8', mode: 0o600, flag: 'wx' })
     await rename(temporaryPath, target)
-  } catch {
+  } catch (error) {
     await unlink(temporaryPath).catch(() => undefined)
+    if (error instanceof KnowledgeWriteError) throw error
+    if (error instanceof KnowledgeFileAccessError) {
+      throw new KnowledgeWriteError(error.message, error.code)
+    }
     throw new KnowledgeWriteError('无法安全写入问题文件。', 'WRITE_FAILED')
   }
   return parseKnowledgeMarkdown(updated, input.problemId)
 }
-

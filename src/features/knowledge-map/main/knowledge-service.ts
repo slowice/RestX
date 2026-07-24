@@ -1,4 +1,4 @@
-import { mkdir, readFile, stat } from 'node:fs/promises'
+import { mkdir } from 'node:fs/promises'
 import type { ResolvedAiProvider } from '../../../platform/ai-provider/shared/contracts'
 import type {
   ApplyKnowledgeClassificationInput,
@@ -8,6 +8,10 @@ import type {
 } from '../shared/contracts'
 import { buildKnowledgeGraph, buildKnowledgeLabelCatalog } from './services/knowledge-catalog'
 import { classifyKnowledgeProblem } from './services/knowledge-classifier'
+import {
+  KnowledgeFileAccessError,
+  readSafeKnowledgeFile
+} from './services/knowledge-file-access'
 import { parseKnowledgeMarkdown, type ParsedKnowledgeMarkdown } from './services/markdown-parser'
 import { applyKnowledgeClassification } from './services/markdown-writer'
 import { scanKnowledgeRoot } from './services/knowledge-scanner'
@@ -53,26 +57,18 @@ export class KnowledgeService {
 
   async read(problemId: string): Promise<KnowledgeProblemDetail> {
     const registered = await this.currentProblem(problemId)
-    let content: string
-    try {
-      content = await readFile(registered.absolutePath, 'utf8')
-    } catch {
-      throw new KnowledgeServiceError('问题文件已不可用，请刷新知识库。', 'SOURCE_UNAVAILABLE')
-    }
-    const metadata = await stat(registered.absolutePath).catch(() => null)
-    const parsed = parseKnowledgeMarkdown(content, problemId, {
-      sizeBytes: metadata?.size,
-      modifiedAt: metadata?.mtime
+    const source = await this.readCurrentFile(registered.absolutePath)
+    const parsed = parseKnowledgeMarkdown(source.content, problemId, {
+      sizeBytes: source.sizeBytes,
+      modifiedAt: source.modifiedAt
     })
     return { ...parsed.summary, markdown: parsed.body }
   }
 
   async classify(problemId: string): Promise<KnowledgeClassificationSuggestion> {
     const registered = await this.currentProblem(problemId)
-    const content = await readFile(registered.absolutePath, 'utf8').catch(() => {
-      throw new KnowledgeServiceError('问题文件已不可用，请刷新知识库。', 'SOURCE_UNAVAILABLE')
-    })
-    const parsed = parseKnowledgeMarkdown(content, problemId)
+    const source = await this.readCurrentFile(registered.absolutePath)
+    const parsed = parseKnowledgeMarkdown(source.content, problemId)
     if (parsed.summary.status === 'invalid') {
       throw new KnowledgeServiceError('请先修复问题文件的 Frontmatter。', 'INVALID_FRONTMATTER')
     }
@@ -99,6 +95,7 @@ export class KnowledgeService {
 
   async open(problemId: string): Promise<void> {
     const problem = await this.currentProblem(problemId)
+    await this.readCurrentFile(problem.absolutePath)
     const error = await this.dependencies.openPath(problem.absolutePath)
     if (error) throw new KnowledgeServiceError('无法使用系统默认应用打开问题文件。', 'OPEN_FAILED')
   }
@@ -115,5 +112,17 @@ export class KnowledgeService {
     if (!problem) throw new KnowledgeServiceError('问题不在当前扫描结果中，请刷新知识库。', 'STALE_PROBLEM')
     return problem
   }
-}
 
+  private async readCurrentFile(
+    absolutePath: string
+  ): Promise<{ content: string; sizeBytes: number; modifiedAt: Date }> {
+    try {
+      return await readSafeKnowledgeFile(this.dependencies.root, absolutePath)
+    } catch (error) {
+      if (error instanceof KnowledgeFileAccessError) {
+        throw new KnowledgeServiceError(error.message, error.code)
+      }
+      throw error
+    }
+  }
+}

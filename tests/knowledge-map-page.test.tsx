@@ -111,6 +111,7 @@ describe('KnowledgeMapPage', () => {
     fireEvent.click(pendingButton)
 
     await waitFor(() => expect(api.read).toHaveBeenCalledWith('pending.md'))
+    expect(api.scan).toHaveBeenCalledTimes(1)
     expect(await screen.findByText('问题正文')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'AI 整理' }))
 

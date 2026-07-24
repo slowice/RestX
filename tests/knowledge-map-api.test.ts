@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm, symlink, unlink, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, test, vi } from 'vitest'
@@ -96,5 +96,42 @@ describe('knowledge map API boundary', () => {
     await service.open('problem.md')
 
     expect(openPath).toHaveBeenCalledWith(path.join(root, 'problem.md'))
+  })
+
+  test('rejects a file replaced by an external symbolic link after scanning', async () => {
+    const root = await createTemporaryRoot()
+    const outside = await createTemporaryRoot()
+    const problemPath = path.join(root, 'problem.md')
+    await writeFile(problemPath, '# Original')
+    await writeFile(path.join(outside, 'secret.md'), '# Secret outside root')
+    const service = new KnowledgeService({
+      root,
+      openPath: vi.fn(async () => ''),
+      executeActive: vi.fn()
+    })
+    await service.scan()
+    await unlink(problemPath)
+    await symlink(path.join(outside, 'secret.md'), problemPath)
+
+    await expect(service.read('problem.md')).rejects.toMatchObject<Partial<KnowledgeServiceError>>({
+      code: 'SOURCE_UNAVAILABLE'
+    })
+  })
+
+  test('rejects a file that grows beyond the preview limit after scanning', async () => {
+    const root = await createTemporaryRoot()
+    const problemPath = path.join(root, 'problem.md')
+    await writeFile(problemPath, '# Original')
+    const service = new KnowledgeService({
+      root,
+      openPath: vi.fn(async () => ''),
+      executeActive: vi.fn()
+    })
+    await service.scan()
+    await writeFile(problemPath, 'x'.repeat(2_000_001))
+
+    await expect(service.read('problem.md')).rejects.toMatchObject<Partial<KnowledgeServiceError>>({
+      code: 'SOURCE_TOO_LARGE'
+    })
   })
 })
