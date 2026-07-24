@@ -31,6 +31,7 @@ export type JsonlTagRule = {
 
 export type JsonlProfile = {
   id: string
+  fileExtensions?: string[]
   timestampPaths: string[]
   sessionPaths?: string[]
   workspacePaths?: string[]

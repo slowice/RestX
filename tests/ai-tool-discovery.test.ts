@@ -192,6 +192,16 @@ describe('AI tool discovery framework', () => {
 
     expect(() => validateAiToolPresets([portable])).not.toThrow()
 
+    const withProfileExtensions = (fileExtensions: unknown): AiToolPreset => ({
+      ...portable,
+      jsonlProfiles: portable.jsonlProfiles?.map((profile) => ({ ...profile, fileExtensions }))
+    }) as unknown as AiToolPreset
+
+    expect(() => validateAiToolPresets([withProfileExtensions(['.log'])])).not.toThrow()
+    expect(() => validateAiToolPresets([withProfileExtensions(['log'])])).toThrow()
+    expect(() => validateAiToolPresets([withProfileExtensions(['.LOG'])])).toThrow()
+    expect(() => validateAiToolPresets([withProfileExtensions(Array.from({ length: 9 }, (_, index) => `.log${index}`))])).toThrow()
+
     const withProbeFields = (fields: Record<string, unknown>): AiToolPreset => ({
       ...portable,
       probes: [{ entryType: 'directory', ...fields }]

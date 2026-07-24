@@ -103,6 +103,7 @@
     },
     {
       "id": "openclaw-gateway-log-v1",
+      "fileExtensions": [".log"],
       "timestampPaths": ["time", "timestamp", "ts", "date", "_meta.date"],
       "summaryPaths": ["message", "0", "1", "2"],
       "tagRules": [

@@ -6,10 +6,10 @@ import { readJsonlEntry, readJsonlPage, searchJsonlWorkspace } from '../src/feat
 
 const temporaryDirectories: string[] = []
 
-async function makeJsonl(lines: string[]): Promise<string> {
+async function makeJsonl(lines: string[], fileName = 'session.jsonl'): Promise<string> {
   const directory = await mkdtemp(path.join(tmpdir(), 'restx-jsonl-'))
   temporaryDirectories.push(directory)
-  const filePath = path.join(directory, 'session.jsonl')
+  const filePath = path.join(directory, fileName)
   await writeFile(filePath, `${lines.join('\n')}\n`)
   return filePath
 }
@@ -53,7 +53,12 @@ describe('JSONL conversation browser', () => {
       JSON.stringify({ time: '2026-07-23T09:00:00Z', level: 'info', subsystem: 'gateway', message: 'Gateway listening on port 18789' }),
       JSON.stringify({ timestamp: '2026-07-23T09:01:00Z', level: 'warn', subsystem: 'gateway', message: 'Gateway retry scheduled' }),
       JSON.stringify({ ts: '2026-07-23T09:02:00Z', level: 'error', subsystem: 'transport', message: 'Gateway connection failed' })
-    ])
+    ], 'openclaw-gateway.log')
+
+    await expect(readJsonlPage({
+      path: filePath,
+      profileId: 'codex-events-v1'
+    })).rejects.toMatchObject({ code: 'UNSUPPORTED_FILE' })
 
     const page = await readJsonlPage({ path: filePath, profileId: 'openclaw-gateway-log-v1' })
     expect(page.entries.map((entry) => entry.tags.map((tag) => tag.label))).toEqual([

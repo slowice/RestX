@@ -89,11 +89,22 @@ export function validateAiToolPresets(presets: readonly AiToolPreset[]): void {
     if (!Array.isArray(profiles) || profiles.length > 8) throw new Error(`JSONL profile 列表无效：${preset.id}`)
     for (const profile of profiles) {
       if (!isRecord(profile)) throw new Error(`JSONL profile 格式无效：${preset.id}`)
-      assertKeys(profile, ['id', 'timestampPaths', 'sessionPaths', 'workspacePaths', 'summaryPaths', 'tagRules'], 'JSONL profile')
+      assertKeys(profile, ['id', 'fileExtensions', 'timestampPaths', 'sessionPaths', 'workspacePaths', 'summaryPaths', 'tagRules'], 'JSONL profile')
       assertShortString(profile.id, 'JSONL profile id', 100)
       if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(profile.id) || profileIds.has(profile.id)) throw new Error(`JSONL profile id 无效或重复：${profile.id}`)
       profileIds.add(profile.id)
       localProfileIds.add(profile.id)
+      if (profile.fileExtensions !== undefined) {
+        if (
+          !Array.isArray(profile.fileExtensions) ||
+          profile.fileExtensions.length === 0 ||
+          profile.fileExtensions.length > 8 ||
+          new Set(profile.fileExtensions).size !== profile.fileExtensions.length ||
+          profile.fileExtensions.some((extension) => typeof extension !== 'string' || !/^\.[a-z0-9][a-z0-9_-]{0,15}$/.test(extension))
+        ) {
+          throw new Error(`JSONL 文件扩展名无效：${profile.id}`)
+        }
+      }
       if (!Array.isArray(profile.timestampPaths) || profile.timestampPaths.length > 12) throw new Error(`JSONL 时间路径无效：${profile.id}`)
       for (const [label, paths] of [
         ['会话', profile.sessionPaths], ['工作区', profile.workspacePaths], ['摘要', profile.summaryPaths]

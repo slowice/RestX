@@ -42,9 +42,10 @@ function getProfile(profileId: string): JsonlProfile {
   return profile
 }
 
-async function inspectFile(filePath: string) {
-  if (path.extname(filePath).toLowerCase() !== '.jsonl') {
-    throw new JsonlBrowserError('只支持浏览 JSONL 文件。', 'UNSUPPORTED_FILE')
+async function inspectFile(filePath: string, profile: JsonlProfile) {
+  const supportedExtensions = new Set(['.jsonl', ...(profile.fileExtensions ?? [])])
+  if (!supportedExtensions.has(path.extname(filePath).toLowerCase())) {
+    throw new JsonlBrowserError('文件扩展名不受当前 JSONL 解析预置支持。', 'UNSUPPORTED_FILE')
   }
   const stat = await lstat(filePath)
   if (!stat.isFile() || stat.isSymbolicLink()) {
@@ -174,7 +175,7 @@ export async function readJsonlSessionSummary({
   profileId: string
 }): Promise<ConversationSessionSummary> {
   const profile = getProfile(profileId)
-  const { stat } = await inspectFile(filePath)
+  const { stat } = await inspectFile(filePath, profile)
   const length = Math.min(stat.size, SESSION_SUMMARY_BYTES)
   const buffer = Buffer.alloc(length)
   const handle = await open(filePath, 'r')
@@ -270,7 +271,7 @@ export async function searchJsonlWorkspace(request: JsonlWorkspaceSearchRequest)
   const inspected = []
   for (const file of uniqueFiles) {
     const profile = getProfile(file.profileId)
-    const { stat, snapshotId } = await inspectFile(file.path)
+    const { stat, snapshotId } = await inspectFile(file.path, profile)
     inspected.push({ ...file, profile, stat, snapshotId })
   }
   inspected.sort((left, right) => right.stat.mtimeMs - left.stat.mtimeMs)
@@ -339,7 +340,7 @@ function splitLines(buffer: Buffer, globalStart: number, includesFileStart: bool
 
 export async function readJsonlPage(request: JsonlPageRequest): Promise<JsonlPage> {
   const profile = getProfile(request.profileId)
-  const { stat, snapshotId } = await inspectFile(request.path)
+  const { stat, snapshotId } = await inspectFile(request.path, profile)
   if (request.query !== undefined) {
     const query = request.query.trim()
     if (!query || query.length > 200 || /[\u0000-\u001F\u007F]/.test(query)) {
@@ -391,7 +392,7 @@ export async function readJsonlPage(request: JsonlPageRequest): Promise<JsonlPag
 
 export async function readJsonlEntry(request: JsonlEntryRequest): Promise<JsonlEntryDetail> {
   const profile = getProfile(request.profileId)
-  const { stat, snapshotId } = await inspectFile(request.path)
+  const { stat, snapshotId } = await inspectFile(request.path, profile)
   if (request.snapshotId !== snapshotId) throw new JsonlBrowserError('文件已更新，请刷新记录列表。', 'FILE_CHANGED')
   const offset = parseInteger(request.offset, 0, 'offset')
   if (!Number.isSafeInteger(request.byteLength) || request.byteLength < 0 || offset + request.byteLength > stat.size) {
