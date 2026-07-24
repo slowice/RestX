@@ -1,10 +1,11 @@
 import { aiInspectorPreloadFeature } from '../../features/ai-inspector/preload/api'
 import { codeReviewPreloadFeature } from '../../features/code-review/preload/api'
 import { mailTemplatePreloadFeature } from '../../features/mail-template/preload/api'
+import { knowledgeMapPreloadFeature } from '../../features/knowledge-map/preload/api'
 import { validateFeatureDefinitions, validateUniqueChannels } from '../shared/feature-validation'
 import type { PreloadFeature, PreloadInvoke } from './define-feature'
 
-const registeredFeatures = [aiInspectorPreloadFeature, codeReviewPreloadFeature, mailTemplatePreloadFeature] satisfies readonly PreloadFeature[]
+const registeredFeatures = [aiInspectorPreloadFeature, codeReviewPreloadFeature, knowledgeMapPreloadFeature, mailTemplatePreloadFeature] satisfies readonly PreloadFeature[]
 
 export const preloadFeatures = validateFeatureDefinitions(registeredFeatures)
 
