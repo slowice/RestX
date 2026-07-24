@@ -24,14 +24,26 @@
         { "glob": "agents/*/sessions/*.jsonl", "kind": "conversation", "viewer": "jsonl", "jsonlProfileId": "openclaw-session-v1", "label": "OpenClaw Agent 会话" }
       ],
       "excludes": [
+        "auth/**",
+        "**/auth/**",
+        "auth.*",
+        "**/auth.*",
+        "**/auth-*",
+        "**/auth_*",
         "credentials/**",
         "**/credentials/**",
+        "credentials.*",
+        "**/credentials.*",
         "agents/*/agent/auth-profiles.json",
         "**/auth-profiles.json",
         "secrets/**",
         "**/secrets/**",
+        "secret.*",
+        "**/secret.*",
         "tokens/**",
         "**/tokens/**",
+        "token.*",
+        "**/token.*",
         "**/*secret*",
         "**/*token*",
         "**/*.db",
@@ -42,12 +54,19 @@
         "caches/**",
         "**/cache/**",
         "**/caches/**",
+        "cache.*",
+        "**/cache.*",
         "sandbox/**",
         "sandboxes/**",
         "**/sandbox/**",
         "**/sandboxes/**",
+        "sandbox.*",
+        "sandboxes.*",
+        "**/sandbox*",
         "media/**",
         "**/media/**",
+        "media.*",
+        "**/media*",
         "**/*.lock"
       ]
     },
@@ -58,10 +77,18 @@
       "label": "OpenClaw macOS 日志",
       "maxDepth": 2,
       "patterns": [
-        { "glob": "*.log", "kind": "log", "viewer": "jsonl", "jsonlProfileId": "openclaw-gateway-log-v1", "label": "OpenClaw Gateway 日志" },
         { "glob": "**/*.log", "kind": "log", "viewer": "jsonl", "jsonlProfileId": "openclaw-gateway-log-v1", "label": "OpenClaw Gateway 日志" }
       ],
-      "excludes": ["**/*.lock", "**/*.db", "**/*.db-*", "**/*.sqlite", "**/*.sqlite-*", "**/cache/**", "**/caches/**"]
+      "excludes": [
+        "auth/**", "**/auth/**", "auth.*", "**/auth.*", "**/auth-*", "**/auth_*",
+        "credentials/**", "**/credentials/**", "credentials.*", "**/credentials.*",
+        "secrets/**", "**/secrets/**", "secret.*", "**/secret.*", "**/*secret*",
+        "tokens/**", "**/tokens/**", "token.*", "**/token.*", "**/*token*",
+        "sandbox/**", "sandboxes/**", "**/sandbox/**", "**/sandboxes/**", "sandbox.*", "sandboxes.*", "**/sandbox*",
+        "media/**", "**/media/**", "media.*", "**/media*",
+        "cache/**", "caches/**", "**/cache/**", "**/caches/**", "cache.*", "**/cache.*",
+        "**/*.lock", "**/*.db", "**/*.db-*", "**/*.sqlite", "**/*.sqlite-*"
+      ]
     },
     {
       "id": "openclaw-temp-logs",
@@ -70,10 +97,18 @@
       "label": "OpenClaw 临时日志",
       "maxDepth": 2,
       "patterns": [
-        { "glob": "*.log", "kind": "log", "viewer": "jsonl", "jsonlProfileId": "openclaw-gateway-log-v1", "label": "OpenClaw Gateway 日志" },
         { "glob": "**/*.log", "kind": "log", "viewer": "jsonl", "jsonlProfileId": "openclaw-gateway-log-v1", "label": "OpenClaw Gateway 日志" }
       ],
-      "excludes": ["**/*.lock", "**/*.db", "**/*.db-*", "**/*.sqlite", "**/*.sqlite-*", "**/cache/**", "**/caches/**"]
+      "excludes": [
+        "auth/**", "**/auth/**", "auth.*", "**/auth.*", "**/auth-*", "**/auth_*",
+        "credentials/**", "**/credentials/**", "credentials.*", "**/credentials.*",
+        "secrets/**", "**/secrets/**", "secret.*", "**/secret.*", "**/*secret*",
+        "tokens/**", "**/tokens/**", "token.*", "**/token.*", "**/*token*",
+        "sandbox/**", "sandboxes/**", "**/sandbox/**", "**/sandboxes/**", "sandbox.*", "sandboxes.*", "**/sandbox*",
+        "media/**", "**/media/**", "media.*", "**/media*",
+        "cache/**", "caches/**", "**/cache/**", "**/caches/**", "cache.*", "**/cache.*",
+        "**/*.lock", "**/*.db", "**/*.db-*", "**/*.sqlite", "**/*.sqlite-*"
+      ]
     },
     {
       "id": "openclaw-macos-launchd-logs",
@@ -82,10 +117,18 @@
       "label": "OpenClaw launchd 日志",
       "maxDepth": 2,
       "patterns": [
-        { "glob": "*.log", "kind": "log", "viewer": "jsonl", "jsonlProfileId": "openclaw-gateway-log-v1", "label": "OpenClaw Gateway 日志" },
         { "glob": "**/*.log", "kind": "log", "viewer": "jsonl", "jsonlProfileId": "openclaw-gateway-log-v1", "label": "OpenClaw Gateway 日志" }
       ],
-      "excludes": ["**/*.lock", "**/*.db", "**/*.db-*", "**/*.sqlite", "**/*.sqlite-*", "**/cache/**", "**/caches/**"]
+      "excludes": [
+        "auth/**", "**/auth/**", "auth.*", "**/auth.*", "**/auth-*", "**/auth_*",
+        "credentials/**", "**/credentials/**", "credentials.*", "**/credentials.*",
+        "secrets/**", "**/secrets/**", "secret.*", "**/secret.*", "**/*secret*",
+        "tokens/**", "**/tokens/**", "token.*", "**/token.*", "**/*token*",
+        "sandbox/**", "sandboxes/**", "**/sandbox/**", "**/sandboxes/**", "sandbox.*", "sandboxes.*", "**/sandbox*",
+        "media/**", "**/media/**", "media.*", "**/media*",
+        "cache/**", "caches/**", "**/cache/**", "**/caches/**", "cache.*", "**/cache.*",
+        "**/*.lock", "**/*.db", "**/*.db-*", "**/*.sqlite", "**/*.sqlite-*"
+      ]
     }
   ],
   "jsonlProfiles": [

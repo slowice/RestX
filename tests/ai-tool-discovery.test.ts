@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { discoverAiTools, validateAiToolPresets } from '../src/features/ai-inspector/main/services/ai-tool-discovery'
 import { AI_TOOL_PRESETS, type AiToolPreset } from '../src/features/ai-inspector/main/presets/ai-tools'
+import { openClawPreset } from '../src/features/ai-inspector/main/presets/ai-tools/openclaw'
 import type { AiToolProbe } from '../src/features/ai-inspector/shared/contracts/ai-tool-preset'
 
 const typeCheckedRelativeProbe = { relativePath: '.tool', entryType: 'directory' } satisfies AiToolProbe
@@ -39,20 +40,29 @@ afterEach(async () => {
 const limits = { maxFiles: 1_000, maxFileSizeBytes: 1024 * 1024 }
 
 describe('AI tool discovery framework', () => {
-  it('discovers OpenClaw state, workspace instructions, sessions, and Gateway logs without credentials', async () => {
+  it('excludes sensitive OpenClaw collisions and scans overlapping macOS TEMP and launchd roots once', async () => {
     const root = await makeFixture()
     const home = await makeFixture()
     const temp = await makeFixture()
     const stateDirectory = path.join(home, '.openclaw')
     const workspace = path.join(stateDirectory, 'workspace')
     const sessionDirectory = path.join(stateDirectory, 'agents', 'main', 'sessions')
+    const macosDefaultLogDirectory = path.join(temp, 'openclaw')
     const gatewayLogDirectory = path.join(temp, 'openclaw-user123')
+    const launchdLogDirectory = path.join(home, 'Library', 'Logs', 'openclaw')
+    const controlledPreset = structuredClone(openClawPreset)
+    const macosDefaultSource = controlledPreset.sources.find((source) => source.id === 'openclaw-macos-default-logs')
+    if (!macosDefaultSource) throw new Error('OpenClaw macOS default source is missing')
+    macosDefaultSource.path = macosDefaultLogDirectory
+    addBuiltInPreset(controlledPreset)
     await Promise.all([
       mkdir(path.join(workspace, 'memory'), { recursive: true }),
       mkdir(sessionDirectory, { recursive: true }),
       mkdir(path.join(stateDirectory, 'agents', 'main', 'agent'), { recursive: true }),
       mkdir(path.join(stateDirectory, 'credentials'), { recursive: true }),
-      mkdir(gatewayLogDirectory, { recursive: true })
+      mkdir(gatewayLogDirectory, { recursive: true }),
+      mkdir(macosDefaultLogDirectory, { recursive: true }),
+      mkdir(launchdLogDirectory, { recursive: true })
     ])
     await Promise.all([
       writeFile(path.join(stateDirectory, 'openclaw.json'), '{"gateway":{"mode":"local"}}'),
@@ -60,41 +70,65 @@ describe('AI tool discovery framework', () => {
       writeFile(path.join(workspace, 'SOUL.md'), 'Be useful.'),
       writeFile(path.join(workspace, 'memory', '2026-07-23.md'), 'Remember the release checklist.'),
       writeFile(path.join(sessionDirectory, 'session-1.jsonl'), [
-        JSON.stringify({ type: 'session', id: 'session-1', timestamp: '2026-07-23T08:00:00Z', cwd: 'C:\\Work\\RestX' }),
+        JSON.stringify({ type: 'session', id: 'session-1', timestamp: '2026-07-23T08:00:00Z', cwd: '/Users/demo/RestX' }),
         JSON.stringify({ type: 'message', timestamp: '2026-07-23T08:01:00Z', message: { role: 'user', content: [{ type: 'text', text: '检查 Gateway 状态' }] } })
       ].join('\n')),
+      ...['auth', 'credentials', 'secret', 'token', 'sandbox', 'media', 'cache'].map((name) =>
+        writeFile(path.join(sessionDirectory, `${name}.jsonl`), JSON.stringify({ type: 'session', id: `sensitive-${name}` }))
+      ),
       writeFile(path.join(stateDirectory, 'agents', 'main', 'agent', 'auth-profiles.json'), '{"token":"secret"}'),
       writeFile(path.join(stateDirectory, 'credentials', 'channel.json'), '{"token":"secret"}'),
-      writeFile(path.join(gatewayLogDirectory, 'openclaw-2026-07-23.log'), JSON.stringify({
+      writeFile(path.join(macosDefaultLogDirectory, 'default.log'), '{"message":"default"}'),
+      writeFile(path.join(gatewayLogDirectory, 'temp.log'), JSON.stringify({
         time: '2026-07-23T08:02:00Z', level: 'info', subsystem: 'gateway', message: 'Gateway started'
-      }))
+      })),
+      writeFile(path.join(launchdLogDirectory, 'launchd.log'), '{"message":"launchd"}')
     ])
+    for (const logDirectory of [macosDefaultLogDirectory, gatewayLogDirectory, launchdLogDirectory]) {
+      await Promise.all([
+        mkdir(path.join(logDirectory, 'credentials'), { recursive: true }),
+        mkdir(path.join(logDirectory, 'secrets'), { recursive: true }),
+        mkdir(path.join(logDirectory, 'sandboxes'), { recursive: true }),
+        mkdir(path.join(logDirectory, 'media'), { recursive: true }),
+        mkdir(path.join(logDirectory, 'cache'), { recursive: true })
+      ])
+      await Promise.all([
+        writeFile(path.join(logDirectory, 'credentials', 'gateway.log'), '{"message":"credential"}'),
+        writeFile(path.join(logDirectory, 'auth.log'), '{"message":"auth"}'),
+        writeFile(path.join(logDirectory, 'secrets', 'token.log'), '{"message":"token"}'),
+        writeFile(path.join(logDirectory, 'sandboxes', 'session.log'), '{"message":"sandbox"}'),
+        writeFile(path.join(logDirectory, 'media', 'output.log'), '{"message":"media"}'),
+        writeFile(path.join(logDirectory, 'cache', 'cached.log'), '{"message":"cache"}')
+      ])
+    }
 
-    const result = await discoverAiTools(root, limits, AI_TOOL_PRESETS, {
+    const result = await discoverAiTools(root, limits, [controlledPreset], {
       homeDirectory: home,
       tempDirectory: temp,
-      platform: 'win32'
+      platform: 'darwin'
     })
     const openClaw = result.tools.find((tool) => tool.id === 'openclaw')
     const openClawCandidates = result.candidates.filter((candidate) => candidate.toolId === 'openclaw')
 
     expect(openClaw).toMatchObject({
       status: 'detected',
-      counts: { config: 1, instruction: 3, conversation: 1, log: 1 }
+      counts: { config: 1, instruction: 3, conversation: 1, log: 3 }
     })
-    expect(openClawCandidates.map((candidate) => candidate.name)).not.toEqual(
-      expect.arrayContaining(['auth-profiles.json', 'channel.json'])
+    expect(result.scannedFileCount).toBe(8)
+    expect(openClawCandidates).toHaveLength(8)
+    expect(openClawCandidates.map((candidate) => candidate.path).join('\n')).not.toMatch(
+      /(?:auth|credentials|secret|token|sandbox|media|cache)/i
     )
     expect(openClawCandidates.find((candidate) => candidate.name === 'session-1.jsonl')).toMatchObject({
       jsonlProfileId: 'openclaw-session-v1',
       session: {
         sessionId: 'session-1',
-        workspace: 'C:\\Work\\RestX',
+        workspace: '/Users/demo/RestX',
         title: '检查 Gateway 状态',
         startedAt: '2026-07-23T08:00:00.000Z'
       }
     })
-    expect(openClawCandidates.find((candidate) => candidate.name === 'openclaw-2026-07-23.log')).toMatchObject({
+    expect(openClawCandidates.find((candidate) => candidate.name === 'temp.log')).toMatchObject({
       kind: 'log',
       viewer: 'jsonl',
       jsonlProfileId: 'openclaw-gateway-log-v1'
@@ -198,6 +232,8 @@ describe('AI tool discovery framework', () => {
     }) as unknown as AiToolPreset
 
     expect(() => validateAiToolPresets([withProfileExtensions(['.log'])])).not.toThrow()
+    expect(() => validateAiToolPresets([withProfileExtensions([])])).toThrow()
+    expect(() => validateAiToolPresets([withProfileExtensions(['.log', '.log'])])).toThrow()
     expect(() => validateAiToolPresets([withProfileExtensions(['log'])])).toThrow()
     expect(() => validateAiToolPresets([withProfileExtensions(['.LOG'])])).toThrow()
     expect(() => validateAiToolPresets([withProfileExtensions(Array.from({ length: 9 }, (_, index) => `.log${index}`))])).toThrow()

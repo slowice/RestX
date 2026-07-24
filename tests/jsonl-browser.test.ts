@@ -2,7 +2,12 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { readJsonlEntry, readJsonlPage, searchJsonlWorkspace } from '../src/features/ai-inspector/main/services/jsonl-browser'
+import {
+  readJsonlEntry,
+  readJsonlPage,
+  readJsonlSessionSummary,
+  searchJsonlWorkspace
+} from '../src/features/ai-inspector/main/services/jsonl-browser'
 
 const temporaryDirectories: string[] = []
 
@@ -92,6 +97,20 @@ describe('JSONL conversation browser', () => {
       contentPreview: 'Gateway retry scheduled',
       timestamp: '2026-07-23T09:01:00.000Z'
     })
+
+    await expect(readJsonlSessionSummary({
+      path: filePath,
+      profileId: 'openclaw-gateway-log-v1'
+    })).resolves.toMatchObject({
+      title: 'Gateway listening on port 18789',
+      startedAt: '2026-07-23T09:00:00.000Z'
+    })
+    const workspaceSearch = await searchJsonlWorkspace({
+      query: 'connection failed',
+      files: [{ path: filePath, profileId: 'openclaw-gateway-log-v1' }]
+    })
+    expect(workspaceSearch.hits).toHaveLength(1)
+    expect(workspaceSearch.hits[0].entry.contentPreview).toBe('Gateway connection failed')
   })
 
   it('loads the newest entries first and derives Codex semantic tags', async () => {

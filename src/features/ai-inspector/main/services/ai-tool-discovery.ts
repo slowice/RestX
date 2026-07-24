@@ -289,6 +289,7 @@ export async function discoverAiTools(
 
   for (const item of detected) {
     if (item.evidence.length === 0) continue
+    const scannedSourcePaths = new Set<string>()
     for (const source of item.preset.sources) {
       if (limitReached) break
       for (const sourcePath of await resolvePresetDeclaration(scanRootPath, item.preset, source, pathEnvironment)) {
@@ -300,6 +301,8 @@ export async function discoverAiTools(
             continue
           }
           const sourceRealPath = await realpath(sourcePath)
+          if (scannedSourcePaths.has(sourceRealPath)) continue
+          scannedSourcePaths.add(sourceRealPath)
           const authorizationRoot = stat.isFile() ? path.dirname(sourceRealPath) : sourceRealPath
           if (isOutsideRoot(scanRootPath, authorizationRoot)) authorizationRoots.add(authorizationRoot)
           if (stat.isFile()) {
