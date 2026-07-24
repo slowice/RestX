@@ -9,10 +9,7 @@ import {
   normalizeClassificationSuggestion
 } from '../src/features/knowledge-map/main/services/knowledge-classifier'
 import { parseKnowledgeMarkdown } from '../src/features/knowledge-map/main/services/markdown-parser'
-import {
-  applyKnowledgeClassification,
-  KnowledgeWriteError
-} from '../src/features/knowledge-map/main/services/markdown-writer'
+import { applyKnowledgeClassification } from '../src/features/knowledge-map/main/services/markdown-writer'
 
 const temporaryRoots: string[] = []
 
@@ -53,7 +50,7 @@ describe('knowledge problem classification', () => {
   })
 
   test('calls the active OpenAI-compatible provider and returns a bounded suggestion', async () => {
-    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
+    const fetchImpl = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({
       choices: [{ message: { content: '{"scene":"Knowledge Manager","capability":["Electron"],"knowledge":["IPC"]}' } }]
     }), { status: 200, headers: { 'content-type': 'application/json' } }))
 
@@ -132,7 +129,7 @@ Keep this exact content.
         capabilities: ['Electron'],
         knowledge: ['IPC']
       }
-    })).rejects.toMatchObject<Partial<KnowledgeWriteError>>({ code: 'SOURCE_CONFLICT' })
+    })).rejects.toMatchObject({ code: 'SOURCE_CONFLICT' })
   })
 
   test('rejects problem IDs that escape the knowledge root', async () => {
@@ -147,7 +144,7 @@ Keep this exact content.
         capabilities: ['Electron'],
         knowledge: ['IPC']
       }
-    })).rejects.toMatchObject<Partial<KnowledgeWriteError>>({ code: 'INVALID_PROBLEM_ID' })
+    })).rejects.toMatchObject({ code: 'INVALID_PROBLEM_ID' })
   })
 
   test('rejects writeback through a symbolic link outside the knowledge root', async () => {
@@ -168,7 +165,7 @@ Keep this exact content.
         capabilities: ['Electron'],
         knowledge: ['IPC']
       }
-    })).rejects.toMatchObject<Partial<KnowledgeWriteError>>({ code: 'SOURCE_UNAVAILABLE' })
+    })).rejects.toMatchObject({ code: 'SOURCE_UNAVAILABLE' })
     await expect(readFile(outsidePath, 'utf8')).resolves.toBe(original)
   })
 })

@@ -6,7 +6,7 @@ import type {
   KnowledgeProblemDetail,
   KnowledgeScanResult
 } from '../shared/contracts'
-import { buildKnowledgeGraph, buildKnowledgeLabelCatalog } from './services/knowledge-catalog'
+import { buildKnowledgeGraph, buildKnowledgeLabelCatalog } from '../shared/knowledge-catalog'
 import { classifyKnowledgeProblem } from './services/knowledge-classifier'
 import {
   KnowledgeFileAccessError,

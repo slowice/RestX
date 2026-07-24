@@ -3,7 +3,7 @@
 - [ ] 1.1 Define knowledge problem, label catalog, graph, classification suggestion, writeback, and error contracts.
 - [ ] 1.2 Implement bounded recursive scanning and Markdown/Frontmatter parsing for `~/.restx/knowledge/`.
 - [ ] 1.3 Implement deterministic virtual scene, capability, knowledge, and problem graph aggregation.
-- [ ] 1.4 Implement feature-owned display preference persistence without storing Markdown content.
+- [ ] 1.4 Keep first-demo display state in renderer memory without persisting Markdown content.
 
 ## 2. AI classification and safe mutation
 

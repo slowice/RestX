@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
-import { buildKnowledgeGraph } from '../src/features/knowledge-map/main/services/knowledge-catalog'
+import { buildKnowledgeGraph } from '../src/features/knowledge-map/shared/knowledge-catalog'
 import { parseKnowledgeMarkdown } from '../src/features/knowledge-map/main/services/markdown-parser'
 import { scanKnowledgeRoot } from '../src/features/knowledge-map/main/services/knowledge-scanner'
 

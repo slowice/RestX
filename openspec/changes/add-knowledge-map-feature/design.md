@@ -25,11 +25,11 @@ RestX requires business functionality to remain inside an isolated feature capsu
 
 ### Use a full feature capsule
 
-The feature owns its renderer, main, preload, shared contracts, styles, persistence, errors, and tests. Renderer receives only structured DTOs. Main owns directory creation, scanning, parsing, AI calls, writeback, backups, and system opening. Preload exposes fixed methods over namespaced channels.
+The feature owns its renderer, main, preload, shared contracts, styles, errors, and tests. Renderer receives only structured DTOs. Main owns directory creation, scanning, parsing, AI calls, writeback, backups, and system opening. Preload exposes fixed methods over namespaced channels.
 
 ### Keep Markdown as the source of truth
 
-No index database is introduced. Each scan rebuilds virtual nodes from Markdown Frontmatter. A small versioned preference file may persist only graph display state; it never stores Markdown content or classification truth.
+No index database is introduced. Each scan rebuilds virtual nodes from Markdown Frontmatter. The first demo keeps temporary display state in renderer memory and never persists Markdown content or classification truth outside the source files and explicit backups.
 
 ### Treat missing metadata as pending rather than invisible
 

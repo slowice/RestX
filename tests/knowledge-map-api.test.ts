@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import type { RestXApi } from '../src/app-api'
-import { KnowledgeService, KnowledgeServiceError } from '../src/features/knowledge-map/main/knowledge-service'
+import { KnowledgeService } from '../src/features/knowledge-map/main/knowledge-service'
 import { knowledgeMapPreloadFeature } from '../src/features/knowledge-map/preload/api'
 import { knowledgeMapChannels } from '../src/features/knowledge-map/shared/channels'
 import type { PreloadInvoke } from '../src/platform/preload/define-feature'
@@ -81,7 +81,7 @@ describe('knowledge map API boundary', () => {
     })
     await service.scan()
 
-    await expect(service.read('../outside.md')).rejects.toMatchObject<Partial<KnowledgeServiceError>>({
+    await expect(service.read('../outside.md')).rejects.toMatchObject({
       code: 'STALE_PROBLEM'
     })
   })
@@ -113,7 +113,7 @@ describe('knowledge map API boundary', () => {
     await unlink(problemPath)
     await symlink(path.join(outside, 'secret.md'), problemPath)
 
-    await expect(service.read('problem.md')).rejects.toMatchObject<Partial<KnowledgeServiceError>>({
+    await expect(service.read('problem.md')).rejects.toMatchObject({
       code: 'SOURCE_UNAVAILABLE'
     })
   })
@@ -130,7 +130,7 @@ describe('knowledge map API boundary', () => {
     await service.scan()
     await writeFile(problemPath, 'x'.repeat(2_000_001))
 
-    await expect(service.read('problem.md')).rejects.toMatchObject<Partial<KnowledgeServiceError>>({
+    await expect(service.read('problem.md')).rejects.toMatchObject({
       code: 'SOURCE_TOO_LARGE'
     })
   })

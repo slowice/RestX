@@ -4,7 +4,7 @@ import type {
   KnowledgeLabelCatalog,
   KnowledgeProblemSummary,
   KnowledgeVirtualNode
-} from '../../shared/contracts'
+} from './contracts'
 
 function key(value: string): string {
   return value.trim().toLocaleLowerCase()

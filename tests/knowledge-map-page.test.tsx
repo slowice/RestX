@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { RestXApi } from '../src/app-api'
-import { buildKnowledgeGraph, buildKnowledgeLabelCatalog } from '../src/features/knowledge-map/main/services/knowledge-catalog'
+import { buildKnowledgeGraph, buildKnowledgeLabelCatalog } from '../src/features/knowledge-map/shared/knowledge-catalog'
 import { KnowledgeMapPage } from '../src/features/knowledge-map/renderer/KnowledgeMapPage'
 import type {
   KnowledgeClassificationSuggestion,
@@ -140,5 +140,24 @@ describe('KnowledgeMapPage', () => {
     expect(await screen.findByText('知识目录还是空的')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '打开知识目录' }))
     expect(api.openRoot).toHaveBeenCalled()
+  })
+
+  test('keeps provider and writeback failures visible without discarding the problem', async () => {
+    const api = installApi()
+    api.classify.mockRejectedValueOnce(new Error('尚未配置可用的 AI Provider。'))
+    render(<KnowledgeMapPage />)
+    fireEvent.click(await screen.findByRole('button', { name: /待整理.*标签应该存在哪里/ }))
+    await screen.findByText('问题正文')
+
+    fireEvent.click(screen.getByRole('button', { name: 'AI 整理' }))
+    expect(await screen.findByText('尚未配置可用的 AI Provider。')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'AI 整理' }))
+    await screen.findByRole('dialog', { name: '确认 AI 整理结果' })
+    api.apply.mockRejectedValueOnce(new Error('问题文件已发生变化，请重新整理。'))
+    fireEvent.click(screen.getByRole('button', { name: '确认并写回' }))
+
+    expect(await screen.findByText('问题文件已发生变化，请重新整理。')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: '确认 AI 整理结果' })).toBeInTheDocument()
   })
 })
