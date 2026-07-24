@@ -232,11 +232,10 @@ function ToolDiscoveryCards({ tools, rootPath, selectedToolId, onSelect }: {
         {tools.map((tool) => {
           const detected = tool.status === 'detected'
           const evidence = tool.evidence[0]?.path
-          const relativeEvidence = evidence ? evidence.slice(rootPath.length).replace(/^[/\\]/, '') : ''
           return (
             <button key={tool.id} className={`tool-card ${detected ? 'detected' : 'undetected'}${selectedToolId === tool.id ? ' selected' : ''}`} disabled={!detected} onClick={() => onSelect(tool.id)}>
               <span className="tool-card-icon"><Bot size={20} /></span>
-              <span className="tool-card-copy"><strong>{tool.displayName}</strong><small title={evidence}>{detected ? `~/${relativeEvidence}` : '未发现本地数据'}</small></span>
+              <span className="tool-card-copy"><strong>{tool.displayName}</strong><small title={evidence}>{detected && evidence ? formatEvidencePath(rootPath, evidence) : '未发现本地数据'}</small></span>
               <span className="tool-card-state">{detected ? <><Check size={12} />已检测到</> : '未发现'}</span>
               {detected && <span className="tool-card-counts">{tool.counts.config} 配置 · {tool.counts.instruction} 指令 · {tool.counts.conversation} 会话 · {tool.counts.history} 历史 · {tool.counts.log} 日志</span>}
             </button>
@@ -245,6 +244,20 @@ function ToolDiscoveryCards({ tools, rootPath, selectedToolId, onSelect }: {
       </div>
     </section>
   )
+}
+
+function formatEvidencePath(rootPath: string, evidencePath: string): string {
+  const normalizedRoot = rootPath.replace(/\\/g, '/').replace(/\/+$/, '') || '/'
+  const normalizedEvidence = evidencePath.replace(/\\/g, '/')
+  const caseInsensitive = /^[a-z]:(?:\/|$)/i.test(normalizedRoot)
+  const comparableRoot = caseInsensitive ? normalizedRoot.toLowerCase() : normalizedRoot
+  const comparableEvidence = caseInsensitive ? normalizedEvidence.toLowerCase() : normalizedEvidence
+  if (comparableEvidence === comparableRoot) return '~/'
+  const rootPrefix = comparableRoot === '/' ? '/' : `${comparableRoot}/`
+  if (comparableEvidence.startsWith(rootPrefix)) {
+    return `~/${normalizedEvidence.slice(rootPrefix.length)}`
+  }
+  return evidencePath
 }
 
 function FolderBreadcrumb({ tool, folder, workspace, onRoot, onTool, onFolder }: {
@@ -411,7 +424,7 @@ function EmptyState({ recentDirectory, onScan, onChoose }: { recentDirectory: st
       <div className="radar"><div /><div /><div /><Search size={30} /></div>
       <span className="pill">READ ONLY</span>
       <h2>扫描用户目录，发现 AI 工具</h2>
-      <p>RestX 会优先识别 Codex、Claude Code 和 OpenCode，再按工具文件夹整理相关配置与日志。</p>
+      <p>RestX 会优先识别 Codex、Claude Code、OpenCode 和 OpenClaw，再按工具文件夹整理相关配置与日志。</p>
       <div className="empty-actions">
         <button className="button primary large" onClick={() => void onChoose()}><FolderOpen size={18} />选择用户目录</button>
         {recentDirectory && <button className="button secondary large" title={recentDirectory} onClick={() => void onScan(recentDirectory)}>扫描最近目录</button>}

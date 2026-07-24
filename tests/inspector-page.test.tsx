@@ -43,7 +43,8 @@ const result: ScanResult = {
       }]
     },
     { id: 'claude-code', displayName: 'Claude Code', status: 'not-detected', evidence: [], counts: { config: 0, instruction: 0, conversation: 0, history: 0, log: 0 }, folders: [] },
-    { id: 'opencode', displayName: 'OpenCode', status: 'not-detected', evidence: [], counts: { config: 0, instruction: 0, conversation: 0, history: 0, log: 0 }, folders: [] }
+    { id: 'opencode', displayName: 'OpenCode', status: 'not-detected', evidence: [], counts: { config: 0, instruction: 0, conversation: 0, history: 0, log: 0 }, folders: [] },
+    { id: 'openclaw', displayName: 'OpenClaw', status: 'not-detected', evidence: [], counts: { config: 0, instruction: 0, conversation: 0, history: 0, log: 0 }, folders: [] }
   ]
 }
 
@@ -96,10 +97,11 @@ describe('Inspector tool folder browser', () => {
     render(<MemoryRouter><InspectorStateProvider><InspectorPage /></InspectorStateProvider></MemoryRouter>)
 
     expect(screen.getByRole('heading', { name: '工具扫描' })).toBeInTheDocument()
+    expect(screen.getByText(/Codex、Claude Code、OpenCode 和 OpenClaw/)).toBeInTheDocument()
 
     fireEvent.click(screen.getAllByRole('button', { name: /选择用户目录/ })[0])
 
-    await waitFor(() => expect(screen.getByText('1 / 3 已检测到')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('1 / 4 已检测到')).toBeInTheDocument())
     expect(screen.getByRole('button', { name: /Claude Code.*未发现/ })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: /配置.*模型、服务和权限等配置/ }))
     expect(screen.getByText('config.toml')).toBeInTheDocument()
@@ -217,7 +219,7 @@ describe('Inspector tool folder browser', () => {
     render(<MemoryRouter><InspectorStateProvider><InspectorPage /></InspectorStateProvider></MemoryRouter>)
 
     fireEvent.click(screen.getAllByRole('button', { name: /选择用户目录/ })[0])
-    await waitFor(() => expect(screen.getByText('1 / 3 已检测到')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('1 / 4 已检测到')).toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: '智能导入' }))
     fireEvent.change(screen.getByPlaceholderText('例如 Gemini CLI、Aider'), { target: { value: 'Nova' } })
     fireEvent.click(screen.getByRole('checkbox'))
@@ -227,5 +229,27 @@ describe('Inspector tool folder browser', () => {
     expect(screen.getByText('根据 .nova 目录生成。')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '确认导入并扫描' }))
     await waitFor(() => expect(api.presets.save).toHaveBeenCalledWith({ preset }))
+  })
+
+  it('shows a canonical external tool evidence path instead of slicing it against the scan root', async () => {
+    const api = makeApi()
+    api.inspector.scanDirectory = vi.fn(async () => ({
+      ...result,
+      candidates: [],
+      tools: result.tools.map((tool) => tool.id === 'openclaw'
+        ? {
+            ...tool,
+            status: 'detected' as const,
+            evidence: [{ path: '/tmp/openclaw', entryType: 'directory' as const }]
+          }
+        : { ...tool, status: 'not-detected' as const, evidence: [] })
+    }))
+    Object.defineProperty(window, 'restx', { configurable: true, value: api })
+    render(<MemoryRouter><InspectorStateProvider><InspectorPage /></InspectorStateProvider></MemoryRouter>)
+
+    fireEvent.click(screen.getAllByRole('button', { name: /选择用户目录/ })[0])
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /OpenClaw.*\/tmp\/openclaw/ })).toBeInTheDocument())
+    expect(screen.queryByText('~/aw')).not.toBeInTheDocument()
   })
 })

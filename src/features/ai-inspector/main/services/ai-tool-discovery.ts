@@ -110,7 +110,7 @@ async function detectPreset(
           continue
         }
         const matches = probe.entryType === 'directory' ? stat.isDirectory() : stat.isFile()
-        if (matches) evidence.push({ path: probePath, entryType: probe.entryType })
+        if (matches) evidence.push({ path: await realpath(probePath), entryType: probe.entryType })
       } catch (error) {
         const code = (error as NodeJS.ErrnoException).code
         if (code === 'EACCES' || code === 'EPERM') pushSkipped(skipped, { path: probePath, reason: `${preset.displayName} 探针无读取权限` })

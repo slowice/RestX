@@ -114,6 +114,7 @@ describe('AI tool discovery framework', () => {
       status: 'detected',
       counts: { config: 1, instruction: 3, conversation: 1, log: 3 }
     })
+    expect(openClaw?.evidence[0]?.path).toBe(await realpath(stateDirectory))
     expect(result.scannedFileCount).toBe(8)
     expect(openClawCandidates).toHaveLength(8)
     expect(openClawCandidates.map((candidate) => candidate.path).join('\n')).not.toMatch(

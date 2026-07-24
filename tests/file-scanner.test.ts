@@ -74,7 +74,9 @@ describe('scanDirectory', () => {
     await writeFile(path.join(root, 'notes.md'), 'ordinary')
     await writeFile(path.join(root, 'node_modules', 'settings.json'), '{}')
 
-    const result = await scanDirectory(root)
+    const result = await scanDirectory(root, {}, {
+      pathEnvironment: { homeDirectory: root, tempDirectory: root, platform: process.platform }
+    })
 
     expect(result.scannedFileCount).toBe(3)
     expect(result.candidates.map((candidate) => [candidate.name, candidate.kind])).toEqual([
@@ -94,7 +96,9 @@ describe('scanDirectory', () => {
   it('stops at the configured file limit', async () => {
     const root = await makeFixture()
     await Promise.all(Array.from({ length: 6 }, (_, index) => writeFile(path.join(root, `${index}.txt`), 'x')))
-    const result = await scanDirectory(root, { maxFiles: 3 })
+    const result = await scanDirectory(root, { maxFiles: 3 }, {
+      pathEnvironment: { homeDirectory: root, tempDirectory: root, platform: process.platform }
+    })
     expect(result.scannedFileCount).toBe(3)
     expect(result.skipped.some((entry) => entry.reason.includes('扫描上限'))).toBe(true)
   })
@@ -106,7 +110,9 @@ describe('scanDirectory', () => {
     await writeFile(path.join(root, '.claude', 'settings.json'), '{}')
     await writeFile(path.join(root, 'documents', 'random.json'), '{}')
 
-    const result = await scanDirectory(root)
+    const result = await scanDirectory(root, {}, {
+      pathEnvironment: { homeDirectory: root, tempDirectory: root, platform: process.platform }
+    })
 
     expect(result.tools.find((tool) => tool.id === 'claude-code')).toMatchObject({ status: 'detected' })
     expect(result.candidates.map((candidate) => candidate.name)).toEqual(['settings.json'])
