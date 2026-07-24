@@ -39,6 +39,68 @@ afterEach(async () => {
 const limits = { maxFiles: 1_000, maxFileSizeBytes: 1024 * 1024 }
 
 describe('AI tool discovery framework', () => {
+  it('discovers OpenClaw state, workspace instructions, sessions, and Gateway logs without credentials', async () => {
+    const root = await makeFixture()
+    const home = await makeFixture()
+    const temp = await makeFixture()
+    const stateDirectory = path.join(home, '.openclaw')
+    const workspace = path.join(stateDirectory, 'workspace')
+    const sessionDirectory = path.join(stateDirectory, 'agents', 'main', 'sessions')
+    const gatewayLogDirectory = path.join(temp, 'openclaw-user123')
+    await Promise.all([
+      mkdir(path.join(workspace, 'memory'), { recursive: true }),
+      mkdir(sessionDirectory, { recursive: true }),
+      mkdir(path.join(stateDirectory, 'agents', 'main', 'agent'), { recursive: true }),
+      mkdir(path.join(stateDirectory, 'credentials'), { recursive: true }),
+      mkdir(gatewayLogDirectory, { recursive: true })
+    ])
+    await Promise.all([
+      writeFile(path.join(stateDirectory, 'openclaw.json'), '{"gateway":{"mode":"local"}}'),
+      writeFile(path.join(workspace, 'AGENTS.md'), 'Follow the project instructions.'),
+      writeFile(path.join(workspace, 'SOUL.md'), 'Be useful.'),
+      writeFile(path.join(workspace, 'memory', '2026-07-23.md'), 'Remember the release checklist.'),
+      writeFile(path.join(sessionDirectory, 'session-1.jsonl'), [
+        JSON.stringify({ type: 'session', id: 'session-1', timestamp: '2026-07-23T08:00:00Z', cwd: 'C:\\Work\\RestX' }),
+        JSON.stringify({ type: 'message', timestamp: '2026-07-23T08:01:00Z', message: { role: 'user', content: [{ type: 'text', text: '检查 Gateway 状态' }] } })
+      ].join('\n')),
+      writeFile(path.join(stateDirectory, 'agents', 'main', 'agent', 'auth-profiles.json'), '{"token":"secret"}'),
+      writeFile(path.join(stateDirectory, 'credentials', 'channel.json'), '{"token":"secret"}'),
+      writeFile(path.join(gatewayLogDirectory, 'openclaw-2026-07-23.log'), JSON.stringify({
+        time: '2026-07-23T08:02:00Z', level: 'info', subsystem: 'gateway', message: 'Gateway started'
+      }))
+    ])
+
+    const result = await discoverAiTools(root, limits, AI_TOOL_PRESETS, {
+      homeDirectory: home,
+      tempDirectory: temp,
+      platform: 'win32'
+    })
+    const openClaw = result.tools.find((tool) => tool.id === 'openclaw')
+    const openClawCandidates = result.candidates.filter((candidate) => candidate.toolId === 'openclaw')
+
+    expect(openClaw).toMatchObject({
+      status: 'detected',
+      counts: { config: 1, instruction: 3, conversation: 1, log: 1 }
+    })
+    expect(openClawCandidates.map((candidate) => candidate.name)).not.toEqual(
+      expect.arrayContaining(['auth-profiles.json', 'channel.json'])
+    )
+    expect(openClawCandidates.find((candidate) => candidate.name === 'session-1.jsonl')).toMatchObject({
+      jsonlProfileId: 'openclaw-session-v1',
+      session: {
+        sessionId: 'session-1',
+        workspace: 'C:\\Work\\RestX',
+        title: '检查 Gateway 状态',
+        startedAt: '2026-07-23T08:00:00.000Z'
+      }
+    })
+    expect(openClawCandidates.find((candidate) => candidate.name === 'openclaw-2026-07-23.log')).toMatchObject({
+      kind: 'log',
+      viewer: 'jsonl',
+      jsonlProfileId: 'openclaw-gateway-log-v1'
+    })
+  })
+
   it('detects Codex and groups only preset-owned safe files', async () => {
     const root = await makeFixture()
     await mkdir(path.join(root, '.codex', 'logs'), { recursive: true })
@@ -52,7 +114,11 @@ describe('AI tool discovery framework', () => {
       JSON.stringify({ timestamp: '2026-07-22T08:01:00Z', type: 'event_msg', payload: { type: 'user_message', message: '为什么模型调用超时？' } })
     ].join('\n'))
 
-    const result = await discoverAiTools(root, limits)
+    const result = await discoverAiTools(root, limits, AI_TOOL_PRESETS, {
+      homeDirectory: root,
+      tempDirectory: root,
+      platform: process.platform
+    })
     const codex = result.tools.find((tool) => tool.id === 'codex')
 
     expect(codex).toMatchObject({

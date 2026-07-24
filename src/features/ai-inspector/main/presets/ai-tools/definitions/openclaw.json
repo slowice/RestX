@@ -1,0 +1,114 @@
+{
+  "id": "openclaw",
+  "displayName": "OpenClaw",
+  "version": 1,
+  "probes": [
+    { "path": "${HOME}/.openclaw", "entryType": "directory" },
+    { "path": "${HOME}/.openclaw/openclaw.json", "entryType": "file" }
+  ],
+  "sources": [
+    {
+      "id": "openclaw-state",
+      "path": "${HOME}/.openclaw",
+      "label": "OpenClaw 状态",
+      "maxDepth": 6,
+      "patterns": [
+        { "glob": "openclaw.json", "kind": "config", "viewer": "config", "label": "OpenClaw 配置" },
+        { "glob": "workspace*/AGENTS.md", "kind": "instruction", "viewer": "config", "label": "OpenClaw Workspace 指令" },
+        { "glob": "workspace*/SOUL.md", "kind": "instruction", "viewer": "config", "label": "OpenClaw Soul 指令" },
+        { "glob": "workspace*/USER.md", "kind": "instruction", "viewer": "config", "label": "OpenClaw User 指令" },
+        { "glob": "workspace*/IDENTITY.md", "kind": "instruction", "viewer": "config", "label": "OpenClaw Identity 指令" },
+        { "glob": "workspace*/MEMORY.md", "kind": "instruction", "viewer": "config", "label": "OpenClaw 长期记忆" },
+        { "glob": "workspace*/HEARTBEAT.md", "kind": "instruction", "viewer": "config", "label": "OpenClaw Heartbeat 指令" },
+        { "glob": "workspace*/memory/**/*.md", "kind": "instruction", "viewer": "config", "label": "OpenClaw Workspace 记忆" },
+        { "glob": "agents/*/sessions/*.jsonl", "kind": "conversation", "viewer": "jsonl", "jsonlProfileId": "openclaw-session-v1", "label": "OpenClaw Agent 会话" }
+      ],
+      "excludes": [
+        "credentials/**",
+        "**/credentials/**",
+        "agents/*/agent/auth-profiles.json",
+        "**/auth-profiles.json",
+        "secrets/**",
+        "**/secrets/**",
+        "tokens/**",
+        "**/tokens/**",
+        "**/*secret*",
+        "**/*token*",
+        "**/*.db",
+        "**/*.db-*",
+        "**/*.sqlite",
+        "**/*.sqlite-*",
+        "cache/**",
+        "caches/**",
+        "**/cache/**",
+        "**/caches/**",
+        "sandbox/**",
+        "sandboxes/**",
+        "**/sandbox/**",
+        "**/sandboxes/**",
+        "media/**",
+        "**/media/**",
+        "**/*.lock"
+      ]
+    },
+    {
+      "id": "openclaw-macos-default-logs",
+      "path": "/tmp/openclaw",
+      "platforms": ["darwin"],
+      "label": "OpenClaw macOS 日志",
+      "maxDepth": 2,
+      "patterns": [
+        { "glob": "*.log", "kind": "log", "viewer": "jsonl", "jsonlProfileId": "openclaw-gateway-log-v1", "label": "OpenClaw Gateway 日志" },
+        { "glob": "**/*.log", "kind": "log", "viewer": "jsonl", "jsonlProfileId": "openclaw-gateway-log-v1", "label": "OpenClaw Gateway 日志" }
+      ],
+      "excludes": ["**/*.lock", "**/*.db", "**/*.db-*", "**/*.sqlite", "**/*.sqlite-*", "**/cache/**", "**/caches/**"]
+    },
+    {
+      "id": "openclaw-temp-logs",
+      "path": "${TEMP}/openclaw*",
+      "platforms": ["darwin", "win32"],
+      "label": "OpenClaw 临时日志",
+      "maxDepth": 2,
+      "patterns": [
+        { "glob": "*.log", "kind": "log", "viewer": "jsonl", "jsonlProfileId": "openclaw-gateway-log-v1", "label": "OpenClaw Gateway 日志" },
+        { "glob": "**/*.log", "kind": "log", "viewer": "jsonl", "jsonlProfileId": "openclaw-gateway-log-v1", "label": "OpenClaw Gateway 日志" }
+      ],
+      "excludes": ["**/*.lock", "**/*.db", "**/*.db-*", "**/*.sqlite", "**/*.sqlite-*", "**/cache/**", "**/caches/**"]
+    },
+    {
+      "id": "openclaw-macos-launchd-logs",
+      "path": "${HOME}/Library/Logs/openclaw",
+      "platforms": ["darwin"],
+      "label": "OpenClaw launchd 日志",
+      "maxDepth": 2,
+      "patterns": [
+        { "glob": "*.log", "kind": "log", "viewer": "jsonl", "jsonlProfileId": "openclaw-gateway-log-v1", "label": "OpenClaw Gateway 日志" },
+        { "glob": "**/*.log", "kind": "log", "viewer": "jsonl", "jsonlProfileId": "openclaw-gateway-log-v1", "label": "OpenClaw Gateway 日志" }
+      ],
+      "excludes": ["**/*.lock", "**/*.db", "**/*.db-*", "**/*.sqlite", "**/*.sqlite-*", "**/cache/**", "**/caches/**"]
+    }
+  ],
+  "jsonlProfiles": [
+    {
+      "id": "openclaw-session-v1",
+      "timestampPaths": ["timestamp", "message.timestamp"],
+      "sessionPaths": ["id", "sessionId"],
+      "workspacePaths": ["cwd", "message.cwd"],
+      "summaryPaths": ["message.content[*].text", "message.content", "summary", "message.text"],
+      "tagRules": [
+        { "path": "type", "fallback": "raw-value" },
+        { "path": "message.role", "fallback": "raw-value" },
+        { "path": "message.content[*].type", "fallback": "raw-value" }
+      ]
+    },
+    {
+      "id": "openclaw-gateway-log-v1",
+      "timestampPaths": ["time", "timestamp", "ts", "date", "_meta.date"],
+      "summaryPaths": ["message", "0", "1", "2"],
+      "tagRules": [
+        { "path": "level", "fallback": "raw-value" },
+        { "path": "subsystem", "fallback": "raw-value" }
+      ]
+    }
+  ]
+}

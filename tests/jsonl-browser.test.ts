@@ -19,6 +19,76 @@ afterEach(async () => {
 })
 
 describe('JSONL conversation browser', () => {
+  it('derives OpenClaw session roles, tool results, and compaction labels', async () => {
+    const filePath = await makeJsonl([
+      JSON.stringify({ type: 'session', id: 'session-1', timestamp: '2026-07-23T08:00:00Z', cwd: '/Users/demo/RestX' }),
+      JSON.stringify({ type: 'message', timestamp: '2026-07-23T08:01:00Z', message: { role: 'user', content: [{ type: 'text', text: '检查 Gateway 状态' }] } }),
+      JSON.stringify({ type: 'message', timestamp: '2026-07-23T08:02:00Z', message: { role: 'assistant', content: [{ type: 'text', text: 'Gateway 正常' }] } }),
+      JSON.stringify({ type: 'toolResult', timestamp: '2026-07-23T08:03:00Z', message: { content: [{ type: 'toolResult', text: 'status: ok' }] } }),
+      JSON.stringify({ type: 'compaction', timestamp: '2026-07-23T08:04:00Z', summary: '已压缩早期上下文' })
+    ])
+
+    const page = await readJsonlPage({ path: filePath, profileId: 'openclaw-session-v1' })
+    const labels = page.entries.flatMap((entry) => entry.tags.map((tag) => tag.label))
+
+    expect(labels).toEqual(expect.arrayContaining(['user', 'assistant', 'toolResult', 'compaction']))
+    expect(page.entries[1]).toMatchObject({
+      workspace: null,
+      contentPreview: '检查 Gateway 状态',
+      timestamp: '2026-07-23T08:01:00.000Z'
+    })
+    const detail = await readJsonlEntry({
+      path: filePath,
+      profileId: 'openclaw-session-v1',
+      offset: page.entries[3].offset,
+      byteLength: page.entries[3].byteLength,
+      snapshotId: page.file.snapshotId
+    })
+    expect(detail.formatted).toContain('\n  "message"')
+    expect(detail.tags).toContainEqual({ label: 'toolResult', tone: 'neutral' })
+  })
+
+  it('browses and searches structured OpenClaw Gateway log entries', async () => {
+    const filePath = await makeJsonl([
+      JSON.stringify({ time: '2026-07-23T09:00:00Z', level: 'info', subsystem: 'gateway', message: 'Gateway listening on port 18789' }),
+      JSON.stringify({ timestamp: '2026-07-23T09:01:00Z', level: 'warn', subsystem: 'gateway', message: 'Gateway retry scheduled' }),
+      JSON.stringify({ ts: '2026-07-23T09:02:00Z', level: 'error', subsystem: 'transport', message: 'Gateway connection failed' })
+    ])
+
+    const page = await readJsonlPage({ path: filePath, profileId: 'openclaw-gateway-log-v1' })
+    expect(page.entries.map((entry) => entry.tags.map((tag) => tag.label))).toEqual([
+      expect.arrayContaining(['info', 'gateway']),
+      expect.arrayContaining(['warn', 'gateway']),
+      expect.arrayContaining(['error', 'transport'])
+    ])
+    expect(page.entries.map((entry) => entry.contentPreview)).toEqual([
+      'Gateway listening on port 18789',
+      'Gateway retry scheduled',
+      'Gateway connection failed'
+    ])
+
+    const detail = await readJsonlEntry({
+      path: filePath,
+      profileId: 'openclaw-gateway-log-v1',
+      offset: page.entries[2].offset,
+      byteLength: page.entries[2].byteLength,
+      snapshotId: page.file.snapshotId
+    })
+    expect(detail.formatted).toContain('\n  "message": "Gateway connection failed"')
+    expect(detail.tags).toContainEqual({ label: 'error', tone: 'neutral' })
+
+    const searched = await readJsonlPage({
+      path: filePath,
+      profileId: 'openclaw-gateway-log-v1',
+      query: 'retry scheduled'
+    })
+    expect(searched.entries).toHaveLength(1)
+    expect(searched.entries[0]).toMatchObject({
+      contentPreview: 'Gateway retry scheduled',
+      timestamp: '2026-07-23T09:01:00.000Z'
+    })
+  })
+
   it('loads the newest entries first and derives Codex semantic tags', async () => {
     const filePath = await makeJsonl([
       JSON.stringify({ timestamp: '2026-07-21T01:00:00Z', type: 'session_meta' }),

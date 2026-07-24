@@ -1,9 +1,10 @@
 import { claudeCodePreset } from './claude-code'
 import { codexPreset } from './codex'
+import { openClawPreset } from './openclaw'
 import { openCodePreset } from './opencode'
 import type { AiToolPreset } from './types'
 
-export const AI_TOOL_PRESETS: readonly AiToolPreset[] = [codexPreset, claudeCodePreset, openCodePreset]
+export const AI_TOOL_PRESETS: readonly AiToolPreset[] = [codexPreset, claudeCodePreset, openCodePreset, openClawPreset]
 let registeredPresets: readonly AiToolPreset[] = AI_TOOL_PRESETS
 
 export function findJsonlProfile(profileId: string) {
