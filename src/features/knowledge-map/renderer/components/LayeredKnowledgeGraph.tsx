@@ -13,10 +13,10 @@ type Props = {
 }
 
 const columnX = {
-  scene: 120,
-  capability: 410,
-  knowledge: 700,
-  problem: 990
+  scene: 92,
+  capability: 332,
+  knowledge: 572,
+  problem: 812
 } as const
 
 function positionsFor(nodes: GraphNode[], kind: GraphNode['kind']): Map<string, { x: number; y: number }> {
@@ -46,9 +46,9 @@ export function LayeredKnowledgeGraph({ graph, selectedProblemId, onSelectProble
     <div className="knowledge-graph-scroll">
       <div className="knowledge-graph" style={{ height }} aria-label="场景、能力、知识和问题的分层路径图">
         <div className="knowledge-graph-columns" aria-hidden="true">
-          {columns.map((column) => <span key={column.kind} style={{ left: columnX[column.kind] - 96 }}>{column.label}</span>)}
+          {columns.map((column) => <span key={column.kind} style={{ left: columnX[column.kind] - 82 }}>{column.label}</span>)}
         </div>
-        <svg className="knowledge-connections" viewBox={`0 0 1110 ${height}`} preserveAspectRatio="none" aria-hidden="true">
+        <svg className="knowledge-connections" viewBox={`0 0 920 ${height}`} preserveAspectRatio="none" aria-hidden="true">
           <defs>
             <marker id="knowledge-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
               <path d="M0,0 L8,4 L0,8 Z" />
@@ -57,8 +57,8 @@ export function LayeredKnowledgeGraph({ graph, selectedProblemId, onSelectProble
           {visibleEdges.map((edge) => {
             const from = position.get(edge.from)!
             const to = position.get(edge.to)!
-            const startX = from.x + 101
-            const endX = to.x - 101
+            const startX = from.x + 83
+            const endX = to.x - 83
             const middle = (startX + endX) / 2
             return (
               <path
@@ -78,7 +78,7 @@ export function LayeredKnowledgeGraph({ graph, selectedProblemId, onSelectProble
                 key={node.id}
                 type="button"
                 className={className}
-                style={{ left: point.x - 100, top: point.y - 28 }}
+                style={{ left: point.x - 82, top: point.y - 28 }}
                 onClick={() => onSelectProblem(node.problemId)}
               >
                 <strong>{node.label}</strong><span>已整理</span>
@@ -86,7 +86,7 @@ export function LayeredKnowledgeGraph({ graph, selectedProblemId, onSelectProble
             )
           }
           return (
-            <div key={node.id} className={className} style={{ left: point.x - 100, top: point.y - 28 }}>
+            <div key={node.id} className={className} style={{ left: point.x - 82, top: point.y - 28 }}>
               <strong>{node.label}</strong><span>{node.problemCount} 个问题</span>
             </div>
           )
@@ -95,4 +95,3 @@ export function LayeredKnowledgeGraph({ graph, selectedProblemId, onSelectProble
     </div>
   )
 }
-
