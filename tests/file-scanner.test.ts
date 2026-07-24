@@ -12,6 +12,11 @@ vi.mock('../src/features/ai-inspector/main/services/user-preset-store', () => ({
 }))
 
 const temporaryDirectories: string[] = []
+const originalBuiltInPresets = [...AI_TOOL_PRESETS]
+
+function addBuiltInPreset(preset: AiToolPreset): void {
+  (AI_TOOL_PRESETS as AiToolPreset[]).push(preset)
+}
 
 async function makeFixture(): Promise<string> {
   const directory = await mkdtemp(path.join(tmpdir(), 'restx-test-'))
@@ -21,6 +26,7 @@ async function makeFixture(): Promise<string> {
 
 afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
+  ;(AI_TOOL_PRESETS as AiToolPreset[]).splice(0, AI_TOOL_PRESETS.length, ...originalBuiltInPresets)
   setRegisteredAiToolPresets(AI_TOOL_PRESETS)
 })
 
@@ -121,13 +127,33 @@ describe('scanDirectory', () => {
         patterns: [{ glob: '*.log', kind: 'log', viewer: 'metadata', label: 'Log' }]
       }]
     }
+    addBuiltInPreset(preset)
     setRegisteredAiToolPresets([preset])
     const authorized: string[] = []
+    let authorizeStarted!: () => void
+    let finishAuthorization!: () => void
+    const authorizationStarted = new Promise<void>((resolve) => { authorizeStarted = resolve })
+    const authorizationGate = new Promise<void>((resolve) => { finishAuthorization = resolve })
 
-    const result = await scanDirectory(root, {}, {
+    const scan = scanDirectory(root, {}, {
       pathEnvironment: { homeDirectory: externalHome, tempDirectory: externalHome, platform: process.platform },
-      authorizeRoot: async (directory) => { authorized.push(directory) }
+      authorizeRoot: async (directory) => {
+        authorized.push(directory)
+        authorizeStarted()
+        await authorizationGate
+      }
     })
+
+    await expect(Promise.race([
+      authorizationStarted.then(() => 'started'),
+      new Promise<string>((resolve) => setTimeout(() => resolve('timed-out'), 100))
+    ])).resolves.toBe('started')
+    let returned = false
+    void scan.then(() => { returned = true })
+    await Promise.resolve()
+    expect(returned).toBe(false)
+    finishAuthorization()
+    const result = await scan
 
     expect(authorized).toEqual([await realpath(externalSource)])
     expect(result.candidates).toMatchObject([{ name: 'gateway.log', kind: 'log' }])

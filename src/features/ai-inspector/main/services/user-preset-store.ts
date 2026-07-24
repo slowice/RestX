@@ -6,7 +6,7 @@ import { parse as parseYaml } from 'yaml'
 import type { AiToolPreset } from '../../shared/contracts/ai-tool-preset'
 import type { UserPresetSummary } from '../../shared/contracts/smart-import'
 import { AI_TOOL_PRESETS, setRegisteredAiToolPresets } from '../presets/ai-tools'
-import { parseAiToolPreset, validateAiToolPresets } from '../presets/ai-tools/validator'
+import { assertAiToolPresetUsesRelativePaths, parseAiToolPreset, validateAiToolPresets } from '../presets/ai-tools/validator'
 
 type PresetState = { disabled: string[] }
 type LoadedUserPresets = { presets: AiToolPreset[]; summaries: UserPresetSummary[] }
@@ -61,6 +61,7 @@ export class UserPresetStore {
         const text = await readFile(filePath, 'utf8')
         if (text.length > 512 * 1024) throw new Error('预置文件超过 512 KiB')
         const preset = parseAiToolPreset(format === 'json' ? JSON.parse(text) : parseYaml(text))
+        assertAiToolPresetUsesRelativePaths(preset)
         if (builtInIds.has(preset.id)) throw new Error(`不能覆盖内置预置：${preset.id}`)
         if (preset.id === 'state' || seenIds.has(preset.id)) throw new Error(`用户预置 id 重复或保留：${preset.id}`)
         const duplicateProfile = (preset.jsonlProfiles ?? []).find((profile) => seenProfileIds.has(profile.id))
@@ -82,6 +83,7 @@ export class UserPresetStore {
 
   async save(presetValue: unknown, overwrite = false): Promise<UserPresetSummary> {
     const preset = parseAiToolPreset(presetValue)
+    assertAiToolPresetUsesRelativePaths(preset)
     if (AI_TOOL_PRESETS.some((builtIn) => builtIn.id === preset.id) || preset.id === 'state') throw new Error('该预置 id 为内置或保留 id。')
     const current = await this.load()
     const existing = current.summaries.find((item) => item.id === preset.id)

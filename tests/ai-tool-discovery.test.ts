@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { discoverAiTools, validateAiToolPresets } from '../src/features/ai-inspector/main/services/ai-tool-discovery'
-import type { AiToolPreset } from '../src/features/ai-inspector/main/presets/ai-tools'
+import { AI_TOOL_PRESETS, type AiToolPreset } from '../src/features/ai-inspector/main/presets/ai-tools'
 import type { AiToolProbe } from '../src/features/ai-inspector/shared/contracts/ai-tool-preset'
 
 const typeCheckedRelativeProbe = { relativePath: '.tool', entryType: 'directory' } satisfies AiToolProbe
@@ -19,6 +19,11 @@ void typeRejectedBothPathProbe
 void typeRejectedMissingPathProbe
 
 const temporaryDirectories: string[] = []
+const originalBuiltInPresets = [...AI_TOOL_PRESETS]
+
+function addBuiltInPreset(preset: AiToolPreset): void {
+  (AI_TOOL_PRESETS as AiToolPreset[]).push(preset)
+}
 
 async function makeFixture(): Promise<string> {
   const directory = await mkdtemp(path.join(tmpdir(), 'restx-tools-'))
@@ -28,6 +33,7 @@ async function makeFixture(): Promise<string> {
 
 afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
+  ;(AI_TOOL_PRESETS as AiToolPreset[]).splice(0, AI_TOOL_PRESETS.length, ...originalBuiltInPresets)
 })
 
 const limits = { maxFiles: 1_000, maxFileSizeBytes: 1024 * 1024 }
@@ -92,6 +98,7 @@ describe('AI tool discovery framework', () => {
     expect(result.candidates[0]).toMatchObject({ name: 'nova.yaml', toolId: 'nova', kind: 'config' })
     expect(result.candidates[1]).toMatchObject({ name: 'session.jsonl', toolId: 'nova', kind: 'conversation', viewer: 'jsonl', jsonlProfileId: 'nova-events-v1' })
     expect(result.tools[0].folders.find((folder) => folder.kind === 'conversation')?.children[0]).toMatchObject({ name: '未知工作区', path: null })
+    expect(result.authorizationRoots).toEqual([])
   })
 
   it('rejects unsafe preset paths before scanning', () => {
@@ -142,7 +149,7 @@ describe('AI tool discovery framework', () => {
     expect(() => validateAiToolPresets([withProbeFields({ path: '${HOME}/.openclaw' })])).not.toThrow()
   })
 
-  it('discovers detected tools from resolved external sources and returns their authorization roots', async () => {
+  it('does not resolve or authorize portable paths from an untrusted preset', async () => {
     const root = await makeFixture()
     const externalHome = await makeFixture()
     const externalSource = path.join(externalHome, 'nova-run')
@@ -162,20 +169,62 @@ describe('AI tool discovery framework', () => {
         patterns: [{ glob: '*.log', kind: 'log', viewer: 'metadata', label: 'Log' }]
       }]
     }
-    const undetectedPreset: AiToolPreset = {
-      ...detectedPreset,
-      id: 'undetected-portable-source',
-      probes: [{ path: '${HOME}/.missing-nova', entryType: 'directory' }]
-    }
-
     const result = await discoverAiTools(root, limits, [detectedPreset], environment)
-    const undetectedResult = await discoverAiTools(root, limits, [undetectedPreset], environment)
 
-    expect(result.tools[0]).toMatchObject({ id: 'portable-source', status: 'detected' })
-    const externalRealPath = await realpath(externalSource)
-    expect(result.candidates).toMatchObject([{ name: 'gateway.log', path: path.join(externalRealPath, 'gateway.log'), kind: 'log' }])
-    expect(result.authorizationRoots).toEqual([externalRealPath])
-    expect(undetectedResult.authorizationRoots).toEqual([])
+    expect(result.tools[0]).toMatchObject({ id: 'portable-source', status: 'not-detected' })
+    expect(result.candidates).toEqual([])
+    expect(result.authorizationRoots).toEqual([])
+  })
+
+  it('discovers every trusted resolved source root using source-relative match rules', async () => {
+    const root = await makeFixture()
+    const externalHome = await makeFixture()
+    const firstSource = path.join(externalHome, 'nova-one')
+    const secondSource = path.join(externalHome, 'nova-two')
+    await mkdir(path.join(externalHome, '.nova'))
+    await mkdir(firstSource)
+    await mkdir(secondSource)
+    await writeFile(path.join(firstSource, 'first.log'), 'one')
+    await writeFile(path.join(secondSource, 'second.log'), 'two')
+    const preset: AiToolPreset = {
+      id: 'trusted-nova', displayName: 'Trusted Nova', version: 1,
+      probes: [{ path: '${HOME}/.nova', entryType: 'directory' }],
+      sources: [{
+        id: 'logs', path: '${TEMP}/nova-*', label: 'Nova logs', maxDepth: 1,
+        patterns: [{ glob: '*.log', kind: 'log', viewer: 'metadata', label: 'Log' }]
+      }]
+    }
+    addBuiltInPreset(preset)
+
+    const result = await discoverAiTools(root, limits, [preset], {
+      homeDirectory: externalHome, tempDirectory: externalHome, platform: process.platform
+    })
+
+    expect(result.candidates.map((candidate) => candidate.name).sort()).toEqual(['first.log', 'second.log'])
+    expect(result.authorizationRoots).toEqual([await realpath(firstSource), await realpath(secondSource)])
+  })
+
+  it('authorizes the real parent directory for a trusted file source', async () => {
+    const root = await makeFixture()
+    const externalHome = await makeFixture()
+    const sourceFile = path.join(externalHome, 'nova.log')
+    await mkdir(path.join(externalHome, '.nova'))
+    await writeFile(sourceFile, 'started')
+    const preset: AiToolPreset = {
+      id: 'trusted-nova-file', displayName: 'Trusted Nova File', version: 1,
+      probes: [{ path: '${HOME}/.nova', entryType: 'directory' }],
+      sources: [{
+        id: 'log', path: '${TEMP}/nova.log', label: 'Nova log', maxDepth: 0,
+        patterns: [{ glob: 'nova.log', kind: 'log', viewer: 'metadata', label: 'Log' }]
+      }]
+    }
+    addBuiltInPreset(preset)
+
+    const result = await discoverAiTools(root, limits, [preset], {
+      homeDirectory: externalHome, tempDirectory: externalHome, platform: process.platform
+    })
+
+    expect(result.authorizationRoots).toEqual([await realpath(externalHome)])
   })
 
   it('rejects executable callbacks in a declarative preset', () => {

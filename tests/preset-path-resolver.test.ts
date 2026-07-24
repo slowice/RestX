@@ -103,6 +103,19 @@ describe('preset path resolver', () => {
     })).resolves.toEqual([])
   })
 
+  it('does not resolve an exact portable path through a symbolic-link ancestor', async () => {
+    const root = await makeFixture()
+    const home = path.join(root, 'home')
+    const external = path.join(root, 'external')
+    await mkdir(path.join(external, '.nova'), { recursive: true })
+    await mkdir(home)
+    await symlink(external, path.join(home, 'linked-parent'))
+
+    await expect(resolvePresetPaths(root, { path: '${HOME}/linked-parent/.nova' }, {
+      homeDirectory: home, tempDirectory: root, platform: 'darwin'
+    })).resolves.toEqual([])
+  })
+
   it('resolves literal /tmp wildcard paths through the macOS tmp alias', async () => {
     const root = await makeFixture()
     const temp = await mkdtemp('/tmp/restx-literal-preset-paths-')

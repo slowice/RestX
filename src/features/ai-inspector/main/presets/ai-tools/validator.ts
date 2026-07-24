@@ -173,6 +173,12 @@ export function validateAiToolPresets(presets: readonly AiToolPreset[]): void {
   }
 }
 
+export function assertAiToolPresetUsesRelativePaths(preset: AiToolPreset): void {
+  for (const declaration of [...preset.probes, ...preset.sources]) {
+    if (typeof declaration.path === 'string') throw new Error('用户预置仅支持相对路径声明。')
+  }
+}
+
 export function parseAiToolPreset(value: unknown): AiToolPreset {
   validateAiToolPresets([value as AiToolPreset])
   return value as AiToolPreset

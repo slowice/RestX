@@ -49,10 +49,16 @@ describe('smart preset generation', () => {
     expect(events.map((event) => event.phase)).toEqual(['request', 'response'])
   })
 
-  it('rejects unsafe model paths and never returns a persistable draft', async () => {
+  it('rejects unsafe or portable model paths and never returns a persistable draft', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'restx-smart-import-'))
     temporaryDirectories.push(root)
-    const unsafe = { ...modelDraft, preset: { ...modelDraft.preset, sources: [{ ...modelDraft.preset.sources[0], relativePath: '/etc' }] } }
+    const unsafe = {
+      ...modelDraft,
+      preset: {
+        ...modelDraft.preset,
+        sources: [{ ...modelDraft.preset.sources[0], relativePath: undefined, path: '${HOME}/.nova' }]
+      }
+    }
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(unsafe) } }] }), { status: 200 }))
 
     await expect(generateSmartPresetDraft({ toolName: 'Nova', rootPath: root, knownPaths: '', notes: '', metadataConsent: true }, {

@@ -4,7 +4,7 @@ import type { AiToolPreset } from '../../shared/contracts/ai-tool-preset'
 import type { SmartPresetDraft, SmartPresetDraftRequest } from '../../shared/contracts/smart-import'
 import { AI_TOOL_PRESETS } from '../presets/ai-tools'
 import { aiProviderRegistry } from '../../../../platform/ai-provider/main/provider-registry'
-import { parseAiToolPreset, validateAiToolPresets } from '../presets/ai-tools/validator'
+import { assertAiToolPresetUsesRelativePaths, parseAiToolPreset, validateAiToolPresets } from '../presets/ai-tools/validator'
 import { aiCallLogger, formatLogTimestamp, type AiCallLogger } from './ai-call-logger'
 import { discoverAiTools } from './ai-tool-discovery'
 import { normalizeBaseUrl, ProviderError, type ProviderSecretSettings } from './openai-provider'
@@ -56,6 +56,7 @@ function parseModelDraft(content: string): { preset: AiToolPreset; explanation: 
       })
     }
     const preset = parseAiToolPreset(normalizedValue)
+    assertAiToolPresetUsesRelativePaths(preset)
     validateAiToolPresets([...AI_TOOL_PRESETS, preset])
     return { preset, explanation: wrapper.explanation, warnings: wrapper.warnings as string[] }
   } catch (error) {

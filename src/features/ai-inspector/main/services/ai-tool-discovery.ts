@@ -8,7 +8,7 @@ import type {
   ToolCandidateCounts,
   ToolFolderNode
 } from '../../shared/contracts/inspector'
-import { AI_TOOL_PRESETS, type AiToolMatchRule, type AiToolPreset, type AiToolSource } from '../presets/ai-tools'
+import { AI_TOOL_PRESETS, type AiToolMatchRule, type AiToolPreset, type AiToolProbe, type AiToolSource } from '../presets/ai-tools'
 import { validateAiToolPresets } from '../presets/ai-tools/validator'
 import { readJsonlSessionSummary } from './jsonl-browser'
 import { resolvePresetPaths, type PresetPathEnvironment } from './preset-path-resolver'
@@ -47,6 +47,20 @@ function normalizedRelative(value: string): string {
 function isOutsideRoot(rootPath: string, candidatePath: string): boolean {
   const relative = path.relative(rootPath, candidatePath)
   return relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)
+}
+
+function isBuiltInPreset(preset: AiToolPreset): boolean {
+  return AI_TOOL_PRESETS.includes(preset)
+}
+
+async function resolvePresetDeclaration(
+  rootPath: string,
+  preset: AiToolPreset,
+  declaration: AiToolProbe | AiToolSource,
+  pathEnvironment?: PresetPathEnvironment
+): Promise<string[]> {
+  if (typeof declaration.path === 'string' && !isBuiltInPreset(preset)) return []
+  return resolvePresetPaths(rootPath, declaration, pathEnvironment)
 }
 
 function globToRegExp(glob: string): RegExp {
@@ -88,7 +102,7 @@ async function detectPreset(
 ): Promise<DetectedAiTool['evidence']> {
   const evidence: DetectedAiTool['evidence'] = []
   for (const probe of preset.probes) {
-    for (const probePath of await resolvePresetPaths(rootPath, probe, pathEnvironment)) {
+    for (const probePath of await resolvePresetDeclaration(rootPath, preset, probe, pathEnvironment)) {
       try {
         const stat = await lstat(probePath)
         if (stat.isSymbolicLink()) {
@@ -195,10 +209,11 @@ export async function discoverAiTools(
   pathEnvironment?: PresetPathEnvironment
 ): Promise<ToolDiscoveryResult> {
   validateAiToolPresets(presets)
+  const scanRootPath = await realpath(rootPath).catch(() => rootPath)
   const skipped: SkippedEntry[] = []
   const detected = await Promise.all(presets.map(async (preset) => ({
     preset,
-    evidence: await detectPreset(rootPath, preset, skipped, pathEnvironment)
+    evidence: await detectPreset(scanRootPath, preset, skipped, pathEnvironment)
   })))
   const candidates: ScanCandidate[] = []
   const candidatePaths = new Set<string>()
@@ -211,7 +226,7 @@ export async function discoverAiTools(
     scannedFileCount += 1
     if (scannedFileCount >= options.maxFiles) {
       limitReached = true
-      pushSkipped(skipped, { path: rootPath, reason: `已达到 ${options.maxFiles} 个文件的扫描上限` })
+      pushSkipped(skipped, { path: scanRootPath, reason: `已达到 ${options.maxFiles} 个文件的扫描上限` })
     }
     const rule = matchingRule(source, relativePath)
     if (!rule || candidatePaths.has(filePath)) return
@@ -234,7 +249,7 @@ export async function discoverAiTools(
         modifiedAt: stat.mtime.toISOString(),
         toolId: preset.id,
         sourceId: source.id,
-        relativePath: normalizedRelative(path.relative(rootPath, filePath))
+        relativePath: normalizedRelative(path.relative(scanRootPath, filePath))
       })
     } catch {
       pushSkipped(skipped, { path: filePath, reason: '无法读取文件元数据' })
@@ -276,7 +291,7 @@ export async function discoverAiTools(
     if (item.evidence.length === 0) continue
     for (const source of item.preset.sources) {
       if (limitReached) break
-      for (const sourcePath of await resolvePresetPaths(rootPath, source, pathEnvironment)) {
+      for (const sourcePath of await resolvePresetDeclaration(scanRootPath, item.preset, source, pathEnvironment)) {
         if (limitReached) break
         try {
           const stat = await lstat(sourcePath)
@@ -286,7 +301,7 @@ export async function discoverAiTools(
           }
           const sourceRealPath = await realpath(sourcePath)
           const authorizationRoot = stat.isFile() ? path.dirname(sourceRealPath) : sourceRealPath
-          if (isOutsideRoot(rootPath, authorizationRoot)) authorizationRoots.add(authorizationRoot)
+          if (isOutsideRoot(scanRootPath, authorizationRoot)) authorizationRoots.add(authorizationRoot)
           if (stat.isFile()) {
             await addFile(sourceRealPath, path.basename(sourceRealPath), item.preset, source)
           } else if (stat.isDirectory()) {

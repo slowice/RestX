@@ -127,5 +127,7 @@ export async function resolvePresetPaths(
   if (resolvedPath.includes('*') && !hasTerminalWildcard) return []
   return hasTerminalWildcard
     ? resolveTerminalWildcard(resolvedPath, trustedTemplateBase(template, resolvedPath, environment))
-    : [resolvedPath]
+    : (await hasSafeWildcardParent(path.dirname(resolvedPath), trustedTemplateBase(template, resolvedPath, environment)))
+      ? [resolvedPath]
+      : []
 }

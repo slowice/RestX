@@ -60,4 +60,21 @@ describe('UserPresetStore', () => {
     const store = new UserPresetStore(directory)
     await expect(store.save({ ...novaPreset, id: 'codex' })).rejects.toThrow(/\u5185置/)
   })
+
+  it('rejects portable external paths during both save and load', async () => {
+    const directory = await makeDirectory()
+    const portablePreset = {
+      ...novaPreset,
+      id: 'portable-nova',
+      probes: [{ path: '${HOME}/.nova', entryType: 'directory' }],
+      sources: [{ ...novaPreset.sources[0], path: '${TEMP}/nova-*', relativePath: undefined }]
+    } as unknown as AiToolPreset
+    const store = new UserPresetStore(directory)
+
+    await expect(store.save(portablePreset)).rejects.toThrow(/相对路径/)
+    await writeFile(path.join(directory, 'portable-nova.json'), JSON.stringify(portablePreset))
+    const result = await store.load()
+    expect(result.presets).toEqual([])
+    expect(result.summaries[0]).toMatchObject({ valid: false, error: expect.stringMatching(/相对路径/) })
+  })
 })
