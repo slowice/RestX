@@ -28,16 +28,15 @@ knowledge-map/
 ├── shared/
 │   ├── contracts.ts
 │   ├── channels.ts
-│   └── api.ts
+│   ├── api.ts
+│   └── knowledge-catalog.ts
 ├── main/
 │   ├── register.ts
 │   └── services/
 │       ├── knowledge-scanner.ts
 │       ├── markdown-parser.ts
-│       ├── knowledge-catalog.ts
 │       ├── knowledge-classifier.ts
-│       ├── markdown-writer.ts
-│       └── knowledge-preferences.ts
+│       └── markdown-writer.ts
 ├── preload/
 │   └── api.ts
 └── renderer/
@@ -97,7 +96,7 @@ knowledge:
 - IPC 不返回绝对路径，错误消息不包含 Markdown 正文。
 - renderer 后续操作只提交当前快照中的问题 ID；main 再次解析并验证其仍位于知识根目录。
 
-第一版不建立数据库，不持久化 Markdown 内容或 AI 响应。`~/.restx/config/knowledge-map.json` 只保存版本化界面偏好，例如折叠的虚拟节点和最后使用的筛选条件。
+第一版不建立数据库，也不持久化 Markdown 内容、AI 响应或临时界面状态。图谱展示状态保持在 renderer 内存中，刷新后由 Markdown 重新构建。
 
 ## AI 分类流程
 

@@ -29,7 +29,7 @@
 - Create: `src/features/knowledge-map/shared/api.ts`
 - Create: `src/features/knowledge-map/main/services/markdown-parser.ts`
 - Create: `src/features/knowledge-map/main/services/knowledge-scanner.ts`
-- Create: `src/features/knowledge-map/main/services/knowledge-catalog.ts`
+- Create: `src/features/knowledge-map/shared/knowledge-catalog.ts`
 - Test: `tests/knowledge-map-domain.test.ts`
 
 **Interfaces:**
