@@ -201,6 +201,54 @@ describe('AI tool discovery framework', () => {
     expect(result.authorizationRoots).toEqual([])
   })
 
+  it('preserves complementary source semantics when two sources resolve to the same root', async () => {
+    const root = await makeFixture()
+    await mkdir(path.join(root, '.dual', 'sessions'), { recursive: true })
+    await writeFile(path.join(root, '.dual', 'settings.json'), '{"enabled":true}')
+    await writeFile(path.join(root, '.dual', 'sessions', 'session.jsonl'), '{"type":"message"}\n')
+    const preset: AiToolPreset = {
+      id: 'dual-source',
+      displayName: 'Dual Source',
+      version: 1,
+      probes: [{ relativePath: '.dual', entryType: 'directory' }],
+      sources: [
+        {
+          id: 'shallow-config',
+          relativePath: '.dual',
+          label: 'Shallow config',
+          maxDepth: 0,
+          patterns: [{ glob: 'settings.json', kind: 'config', viewer: 'config', label: 'Settings' }]
+        },
+        {
+          id: 'deep-sessions',
+          relativePath: '.dual',
+          label: 'Deep sessions',
+          maxDepth: 2,
+          patterns: [{
+            glob: 'sessions/*.jsonl',
+            kind: 'conversation',
+            viewer: 'jsonl',
+            jsonlProfileId: 'dual-events-v1',
+            label: 'Sessions'
+          }]
+        }
+      ],
+      jsonlProfiles: [{
+        id: 'dual-events-v1',
+        timestampPaths: [],
+        tagRules: [{ path: 'type', fallback: 'raw-value' }]
+      }]
+    }
+
+    const result = await discoverAiTools(root, limits, [preset])
+
+    expect(result.candidates).toEqual([
+      expect.objectContaining({ name: 'settings.json', kind: 'config', sourceId: 'shallow-config' }),
+      expect.objectContaining({ name: 'session.jsonl', kind: 'conversation', sourceId: 'deep-sessions' })
+    ])
+    expect(result.tools[0].counts).toMatchObject({ config: 1, conversation: 1 })
+  })
+
   it('rejects unsafe preset paths before scanning', () => {
     const unsafe: AiToolPreset = {
       id: 'unsafe', displayName: 'Unsafe', version: 1,

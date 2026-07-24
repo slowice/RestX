@@ -130,6 +130,20 @@ function matchingRule(source: AiToolSource, relativePath: string): AiToolMatchRu
   return source.patterns.find((rule) => matchesPresetGlob(rule.glob, relativePath)) ?? null
 }
 
+function sourceScanKey(sourceRealPath: string, source: AiToolSource): string {
+  return JSON.stringify({
+    sourceRealPath,
+    maxDepth: source.maxDepth,
+    patterns: source.patterns.map((rule) => ({
+      glob: rule.glob,
+      kind: rule.kind,
+      viewer: rule.viewer,
+      jsonlProfileId: rule.jsonlProfileId ?? null
+    })),
+    excludes: [...(source.excludes ?? [])].sort()
+  })
+}
+
 function buildFolders(candidates: ScanCandidate[]): { counts: ToolCandidateCounts; folders: ToolFolderNode[] } {
   const counts = emptyCounts()
   for (const candidate of candidates) counts[candidate.kind] += 1
@@ -289,7 +303,7 @@ export async function discoverAiTools(
 
   for (const item of detected) {
     if (item.evidence.length === 0) continue
-    const scannedSourcePaths = new Set<string>()
+    const scannedSourceKeys = new Set<string>()
     for (const source of item.preset.sources) {
       if (limitReached) break
       for (const sourcePath of await resolvePresetDeclaration(scanRootPath, item.preset, source, pathEnvironment)) {
@@ -301,8 +315,9 @@ export async function discoverAiTools(
             continue
           }
           const sourceRealPath = await realpath(sourcePath)
-          if (scannedSourcePaths.has(sourceRealPath)) continue
-          scannedSourcePaths.add(sourceRealPath)
+          const scanKey = sourceScanKey(sourceRealPath, source)
+          if (scannedSourceKeys.has(scanKey)) continue
+          scannedSourceKeys.add(scanKey)
           const authorizationRoot = stat.isFile() ? path.dirname(sourceRealPath) : sourceRealPath
           if (isOutsideRoot(scanRootPath, authorizationRoot)) authorizationRoots.add(authorizationRoot)
           if (stat.isFile()) {
