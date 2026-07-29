@@ -73,7 +73,7 @@ export class CodeReviewService {
       for (const batch of batches) {
         const response = await this.providers.execute(provider.id, ({ provider: resolved, fetch }) => {
           usedModel = resolved.modelId
-          return reviewCodeBatch({ settings: { baseUrl: resolved.baseUrl, model: resolved.modelId, apiKey: resolved.apiKey }, batch, rulePacks, requirements: input.requirements, sourceSummary: { title: source.preview.title, repository: `${locator.owner}/${locator.repository}`, baseBranch: source.preview.baseBranch, headBranch: source.preview.headBranch }, fetchImpl: fetch })
+          return reviewCodeBatch({ settings: { baseUrl: resolved.baseUrl, model: resolved.modelId, apiKey: resolved.apiKey, customHeaders: resolved.customHeaders }, batch, rulePacks, requirements: input.requirements, sourceSummary: { title: source.preview.title, repository: `${locator.owner}/${locator.repository}`, baseBranch: source.preview.baseBranch, headBranch: source.preview.headBranch }, fetchImpl: fetch })
         })
         summaries.push(response.summary)
         findings.push(...response.findings)

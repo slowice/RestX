@@ -31,6 +31,7 @@ const provider: ResolvedAiProvider = {
   modelId: 'test-model',
   useSystemProxy: false,
   apiKey: 'secret',
+  customHeaders: {},
   identityFingerprint: 'identity',
   credentialFingerprint: 'credential'
 }

@@ -49,6 +49,20 @@ describe('AiProviderRegistry', () => {
     expect(await registry.getActiveSecret()).toMatchObject({ name: 'Updated', baseUrl: 'https://two.example/v1', modelId: 'second', apiKey: 'key-one' })
   })
 
+  it('normalizes custom headers, applies the last duplicate, and rejects unsafe values without changing saved headers', async () => {
+    const registry = new AiProviderRegistry(new MemoryStorage(), { crypto, readClaudeCode: async () => null })
+    const created = await registry.create({ name: 'Demo', baseUrl: 'https://one.example/v1', modelId: 'first', apiKey: 'key-one' })
+    const state = await registry.setCustomHeaders(created.activeProviderId!, [
+      { name: 'X-Gateway', value: 'first' },
+      { name: 'authorization', value: 'Gateway token' },
+      { name: 'X-Gateway', value: 'last' },
+      { name: '', value: '' }
+    ])
+    expect(state.providers[0].customHeaders).toEqual({ 'X-Gateway': 'last', authorization: 'Gateway token' })
+    await expect(registry.setCustomHeaders(created.activeProviderId!, [{ name: 'X-Bad', value: 'line\nbreak' }])).rejects.toMatchObject({ code: 'INVALID_SETTINGS' })
+    expect((await registry.getState()).providers[0].customHeaders).toEqual({ 'X-Gateway': 'last', authorization: 'Gateway token' })
+  })
+
   it('imports Claude Code once, defaults the model, and does not persist its token', async () => {
     const storage = new MemoryStorage()
     let config: ClaudeCodeConfig = { sourcePath: '/Users/demo/.claude/settings.json', baseUrl: 'https://claude.example/v1', modelId: 'GLM5.1', apiKey: 'rotating-token', fileSignature: '1:100' }
@@ -108,6 +122,16 @@ describe('AiProviderRegistry', () => {
     })
     expect(result).toBe('ok')
     expect(attemptedKeys).toEqual(['token-one', 'token-two'])
+  })
+
+  it('keeps RestX-managed headers when Claude Code configuration refreshes', async () => {
+    let config: ClaudeCodeConfig = { sourcePath: '/Users/demo/.claude/settings.json', baseUrl: 'https://claude.example/v1', modelId: 'demo', apiKey: 'token-one', fileSignature: '1:100' }
+    const registry = new AiProviderRegistry(new MemoryStorage(), { crypto, readClaudeCode: async () => config })
+    const initial = await registry.getState()
+    await registry.setCustomHeaders(initial.providers[0].id, [{ name: 'X-Gateway', value: 'restx' }])
+    config = { ...config, modelId: 'updated', apiKey: 'token-two', fileSignature: '2:100' }
+    const refreshed = await registry.refreshExternal()
+    expect(refreshed.providers[0]).toMatchObject({ modelId: 'updated', customHeaders: { 'X-Gateway': 'restx' } })
   })
 
   it('migrates and deduplicates legacy providers without deleting legacy data', async () => {

@@ -54,7 +54,7 @@ describe('analyzeWithOpenAiCompatible', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1)
     const [url, request] = (fetchImpl.mock.calls as unknown as Array<[string, RequestInit]>)[0]
     expect(url).toBe('https://example.com/v1/chat/completions')
-    expect(request.headers).toMatchObject({ Authorization: 'Bearer top-secret' })
+    expect(new Headers(request.headers).get('authorization')).toBe('Bearer top-secret')
     const body = JSON.parse(String(request.body))
     expect(body.model).toBe('demo-model')
     expect(JSON.stringify(body)).not.toContain('top-secret')

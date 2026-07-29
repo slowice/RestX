@@ -4,6 +4,7 @@ import type { AiToolPreset } from '../../shared/contracts/ai-tool-preset'
 import type { SmartPresetDraft, SmartPresetDraftRequest } from '../../shared/contracts/smart-import'
 import { AI_TOOL_PRESETS } from '../presets/ai-tools'
 import { aiProviderRegistry } from '../../../../platform/ai-provider/main/provider-registry'
+import { createOpenAiRequestHeaders } from '../../../../platform/ai-provider/main/openai-client'
 import { assertAiToolPresetUsesRelativePaths, parseAiToolPreset, validateAiToolPresets } from '../presets/ai-tools/validator'
 import { aiCallLogger, formatLogTimestamp, type AiCallLogger } from './ai-call-logger'
 import { discoverAiTools } from './ai-tool-discovery'
@@ -86,7 +87,7 @@ async function requestDraft({ settings, userPayload, fetchImpl = fetch, logger =
   let response: Response
   try {
     response = await fetchImpl(endpoint, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settings.apiKey}` },
+      method: 'POST', headers: createOpenAiRequestHeaders(settings),
       body: JSON.stringify(requestPayload), signal: AbortSignal.timeout(180_000)
     })
   } catch (error) {
@@ -150,7 +151,7 @@ export async function generateSmartPresetDraft(
   const content = dependencies.settings
     ? await request(dependencies.settings)
     : await aiProviderRegistry.executeActive(({ provider, fetch }) => request(
-      { baseUrl: provider.baseUrl, model: provider.modelId, apiKey: provider.apiKey },
+      { baseUrl: provider.baseUrl, model: provider.modelId, apiKey: provider.apiKey, customHeaders: provider.customHeaders },
       fetch
     ))
   const parsed = parseModelDraft(content)

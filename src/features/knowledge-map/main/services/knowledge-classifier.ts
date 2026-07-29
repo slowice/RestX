@@ -1,4 +1,5 @@
 import type { ResolvedAiProvider } from '../../../../platform/ai-provider/shared/contracts'
+import { createOpenAiRequestHeaders } from '../../../../platform/ai-provider/main/openai-client'
 import { normalizeAiBaseUrl } from '../../../../platform/ai-provider/main/openai-client'
 import type {
   KnowledgeClassificationSuggestion,
@@ -154,10 +155,7 @@ export async function classifyKnowledgeProblem({
   try {
     response = await fetchImpl(endpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${provider.apiKey}`
-      },
+      headers: createOpenAiRequestHeaders(provider),
       body: JSON.stringify({
         model: provider.modelId,
         temperature: 0.1,

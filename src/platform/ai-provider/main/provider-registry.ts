@@ -10,6 +10,7 @@ import type {
   AiProviderExecutionContext,
   AiProviderState,
   AiProviderTestResult,
+  AiProviderCustomHeaderInput,
   CreateAiProviderInput,
   ResolvedAiProvider,
   UpdateAiProviderInput
@@ -30,6 +31,7 @@ type StoredProvider = {
   sourcePath?: string
   available?: boolean
   statusMessage?: string
+  customHeaders?: Record<string, string>
   createdAt: string
   updatedAt: string
 }
@@ -86,6 +88,33 @@ function requiredText(value: string, field: string, maxLength: number): string {
   return normalized
 }
 
+const HEADER_NAME = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/
+
+function normalizeCustomHeaders(headers: readonly AiProviderCustomHeaderInput[]): Record<string, string> {
+  if (!Array.isArray(headers) || headers.length > 50) throw new AiProviderError('自定义请求头无效。', 'INVALID_SETTINGS')
+  const normalized = new Map<string, { name: string; value: string }>()
+  for (const header of headers) {
+    if (!header || typeof header !== 'object' || typeof header.name !== 'string' || typeof header.value !== 'string') {
+      throw new AiProviderError('自定义请求头无效。', 'INVALID_SETTINGS')
+    }
+    const name = header.name.trim()
+    if (!name && !header.value) continue
+    if (!name || name.length > 200 || !HEADER_NAME.test(name) || header.value.length > 16_000 || /[\r\n]/.test(header.value)) {
+      throw new AiProviderError('自定义请求头无效。', 'INVALID_SETTINGS')
+    }
+    normalized.set(name.toLowerCase(), { name, value: header.value })
+  }
+  return Object.fromEntries([...normalized.values()].map(({ name, value }) => [name, value]))
+}
+
+function storedCustomHeaders(provider: StoredProvider): Record<string, string> {
+  if (!provider.customHeaders || typeof provider.customHeaders !== 'object' || Array.isArray(provider.customHeaders)) return {}
+  const entries = Object.entries(provider.customHeaders)
+    .filter(([name, value]) => HEADER_NAME.test(name) && typeof value === 'string' && value.length <= 16_000 && !/[\r\n]/.test(value))
+    .slice(0, 50)
+  return Object.fromEntries(entries)
+}
+
 function errorCode(reason: unknown): string | undefined {
   return reason && typeof reason === 'object' && 'code' in reason && typeof reason.code === 'string' ? reason.code : undefined
 }
@@ -123,6 +152,7 @@ export class AiProviderRegistry {
       modelId: requiredText(input.modelId, '模型 ID', 300),
       useSystemProxy: false,
       encryptedApiKey: this.dependencies.crypto.encrypt(apiKey),
+      customHeaders: {},
       createdAt: now,
       updatedAt: now
     }
@@ -184,6 +214,16 @@ export class AiProviderRegistry {
       useSystemProxy: enabled,
       updatedAt: this.now().toISOString()
     }
+    this.storage.set('providers', providers)
+    return this.publicState()
+  }
+
+  async setCustomHeaders(id: string, headers: AiProviderCustomHeaderInput[]): Promise<AiProviderState> {
+    await this.initialize()
+    const providers = this.providers()
+    const index = providers.findIndex((provider) => provider.id === id)
+    if (index < 0) throw new AiProviderError('Provider 不存在。', 'NOT_FOUND')
+    providers[index] = { ...providers[index], customHeaders: normalizeCustomHeaders(headers), updatedAt: this.now().toISOString() }
     this.storage.set('providers', providers)
     return this.publicState()
   }
@@ -277,6 +317,7 @@ export class AiProviderRegistry {
       modelId: provider.modelId,
       useSystemProxy: provider.useSystemProxy === true,
       apiKey,
+      customHeaders: storedCustomHeaders(provider),
       identityFingerprint: this.identityFingerprint(provider),
       credentialFingerprint
     }
@@ -307,6 +348,7 @@ export class AiProviderRegistry {
       useSystemProxy: index >= 0 ? providers[index].useSystemProxy === true : false,
       sourcePath: path.resolve(config.sourcePath),
       available: true,
+      customHeaders: index >= 0 ? storedCustomHeaders(providers[index]) : {},
       createdAt: index >= 0 ? providers[index].createdAt : now,
       updatedAt: now
     }
@@ -369,6 +411,7 @@ export class AiProviderRegistry {
         baseUrl: provider.baseUrl,
         modelId: provider.modelId,
         useSystemProxy: provider.useSystemProxy === true,
+        customHeaders: storedCustomHeaders(provider),
         apiKeyConfigured: provider.source === 'claude-code' ? provider.available === true : Boolean(provider.encryptedApiKey),
         status: ready ? 'ready' : provider.source === 'claude-code' ? 'unavailable' : 'incomplete',
         ...(provider.statusMessage ? { statusMessage: provider.statusMessage } : {}),
@@ -401,7 +444,8 @@ export class AiProviderRegistry {
   }
 
   private identityFingerprint(provider: StoredProvider): string {
-    return createHash('sha256').update(`${provider.id}\0${provider.baseUrl}\0${provider.modelId}`).digest('hex')
+    const headers = Object.entries(storedCustomHeaders(provider)).sort(([left], [right]) => left.localeCompare(right))
+    return createHmac('sha256', this.ensureFingerprintKey()).update(JSON.stringify([provider.id, provider.baseUrl, provider.modelId, headers])).digest('hex')
   }
 
   private credentialFingerprint(apiKey: string): string {
@@ -486,6 +530,7 @@ export const aiProviderRegistry = {
   delete: (id: string): Promise<AiProviderState> => (registryInstance ??= createDefaultRegistry()).delete(id),
   setActive: (id: string): Promise<AiProviderState> => (registryInstance ??= createDefaultRegistry()).setActive(id),
   setSystemProxy: (id: string, enabled: boolean): Promise<AiProviderState> => (registryInstance ??= createDefaultRegistry()).setSystemProxy(id, enabled),
+  setCustomHeaders: (id: string, headers: AiProviderCustomHeaderInput[]): Promise<AiProviderState> => (registryInstance ??= createDefaultRegistry()).setCustomHeaders(id, headers),
   test: (id: string): Promise<AiProviderTestResult> => (registryInstance ??= createDefaultRegistry()).test(id),
   refreshExternal: (): Promise<AiProviderState> => (registryInstance ??= createDefaultRegistry()).refreshExternal(),
   getActivePublic: (): Promise<AiProviderPublic> => (registryInstance ??= createDefaultRegistry()).getActivePublic(),

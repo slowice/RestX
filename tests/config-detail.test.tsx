@@ -28,8 +28,8 @@ function makeApi(consent: boolean): RestXApi {
       setAiLocalAnalysisEnabled: vi.fn(), clearHistory: vi.fn()
     },
     providers: {
-      getState: vi.fn(async () => ({ activeProviderId: 'demo', providers: [{ id: 'demo', name: 'Demo', source: 'manual' as const, baseUrl: 'https://example.com/v1', modelId: 'demo', useSystemProxy: false, apiKeyConfigured: true, status: 'ready' as const, active: true, editable: true, identityFingerprint: 'identity' }] })),
-      create: vi.fn(), update: vi.fn(), delete: vi.fn(), setActive: vi.fn(), setSystemProxy: vi.fn(), test: vi.fn(), refreshExternal: vi.fn()
+      getState: vi.fn(async () => ({ activeProviderId: 'demo', providers: [{ id: 'demo', name: 'Demo', source: 'manual' as const, baseUrl: 'https://example.com/v1', modelId: 'demo', useSystemProxy: false, customHeaders: {}, apiKeyConfigured: true, status: 'ready' as const, active: true, editable: true, identityFingerprint: 'identity' }] })),
+      create: vi.fn(), update: vi.fn(), delete: vi.fn(), setActive: vi.fn(), setSystemProxy: vi.fn(), setCustomHeaders: vi.fn(), test: vi.fn(), refreshExternal: vi.fn()
     },
     ai: {
       analyzeConfig: vi.fn(),

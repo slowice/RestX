@@ -101,7 +101,7 @@ describe('review cache and zone enforcement', () => {
         expect(id).toBe('shared')
         providerCalls += 1
         return operation({
-          provider: { id: 'shared', name: 'Shared', source: 'manual', baseUrl: 'https://ai.example/v1', modelId: 'common-model', useSystemProxy: false, apiKey, identityFingerprint: 'stable-model-identity', credentialFingerprint: apiKey },
+          provider: { id: 'shared', name: 'Shared', source: 'manual', baseUrl: 'https://ai.example/v1', modelId: 'common-model', useSystemProxy: false, apiKey, customHeaders: {}, identityFingerprint: 'stable-model-identity', credentialFingerprint: apiKey },
           fetch
         })
       }

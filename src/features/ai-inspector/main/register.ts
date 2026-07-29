@@ -81,7 +81,7 @@ const analysisService = new ConfigAnalysisService({
   isConsentEnabled: () => preferences.get().aiLocalAnalysisEnabled,
   analyzeProvider: (document, providerId) => aiProviderRegistry.execute(providerId, async ({ provider, fetch }) => ({
     result: await analyzeWithOpenAiCompatible({
-      settings: { baseUrl: provider.baseUrl, model: provider.modelId, apiKey: provider.apiKey },
+      settings: { baseUrl: provider.baseUrl, model: provider.modelId, apiKey: provider.apiKey, customHeaders: provider.customHeaders },
       document,
       fetchImpl: fetch,
       logger: aiCallLogger

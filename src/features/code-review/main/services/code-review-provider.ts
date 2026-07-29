@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { ReviewCategory, ReviewConfidence, ReviewFinding, ReviewSeverity } from '../../shared/contracts/code-review'
-import { AiProviderError as ProviderError, normalizeAiBaseUrl as normalizeBaseUrl } from '../../../../platform/ai-provider/main/openai-client'
+import { AiProviderError as ProviderError, createOpenAiRequestHeaders, normalizeAiBaseUrl as normalizeBaseUrl } from '../../../../platform/ai-provider/main/openai-client'
 import type { ChangedReviewFile } from './code-review-source'
 import type { ReviewRulePack } from './review-rule-packs'
 
@@ -12,7 +12,7 @@ const MAX_BATCH_CHARACTERS = 58_000
 
 type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
 
-type ProviderSecretSettings = { baseUrl: string; model: string; apiKey: string }
+type ProviderSecretSettings = { baseUrl: string; model: string; apiKey: string; customHeaders?: Record<string, string> }
 
 export type ReviewBatch = { files: ChangedReviewFile[]; inputCharacters: number }
 export type ReviewProviderResponse = { summary: string; findings: ReviewFinding[] }
@@ -121,7 +121,7 @@ export async function reviewCodeBatch({ settings, batch, rulePacks, requirements
   })
   let response: Response
   try {
-    response = await fetchImpl(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settings.apiKey}` }, body, redirect: 'error', signal: AbortSignal.timeout(180_000) })
+    response = await fetchImpl(endpoint, { method: 'POST', headers: createOpenAiRequestHeaders(settings), body, redirect: 'error', signal: AbortSignal.timeout(180_000) })
   } catch {
     throw new ProviderError('无法连接代码检视 AI 服务，请检查当前 Provider 和网络。', 'CONNECTION_FAILED')
   }

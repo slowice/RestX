@@ -1,5 +1,5 @@
 import { app } from 'electron'
-import type { CreateAiProviderInput, UpdateAiProviderInput } from '../ai-provider/shared/contracts'
+import type { AiProviderCustomHeaderInput, CreateAiProviderInput, UpdateAiProviderInput } from '../ai-provider/shared/contracts'
 import { aiProviderRegistry } from '../ai-provider/main/provider-registry'
 import { platformChannels } from '../shared/platform-api'
 import { registerMainFeatures } from './feature-registry'
@@ -31,6 +31,15 @@ function assertUpdateProvider(value: unknown): asserts value is UpdateAiProvider
   if (input.apiKey !== undefined && typeof input.apiKey !== 'string') throw new Error('apiKey 参数无效。')
 }
 
+function assertCustomHeaders(value: unknown): asserts value is AiProviderCustomHeaderInput[] {
+  if (!Array.isArray(value) || value.length > 50) throw new Error('自定义请求头参数无效。')
+  for (const header of value) {
+    if (!header || typeof header !== 'object' || typeof (header as Record<string, unknown>).name !== 'string' || typeof (header as Record<string, unknown>).value !== 'string') {
+      throw new Error('自定义请求头参数无效。')
+    }
+  }
+}
+
 export async function registerApplication(): Promise<() => void> {
   const registry = new IpcHandlerRegistry()
   try {
@@ -58,6 +67,11 @@ export async function registerApplication(): Promise<() => void> {
       assertId(id)
       if (typeof enabled !== 'boolean') throw new Error('系统代理参数无效。')
       return aiProviderRegistry.setSystemProxy(id, enabled)
+    })
+    ipc.handle(platformChannels.setProviderCustomHeaders, (_event, id: unknown, headers: unknown) => {
+      assertId(id)
+      assertCustomHeaders(headers)
+      return aiProviderRegistry.setCustomHeaders(id, headers)
     })
     ipc.handle(platformChannels.testProvider, (_event, id: unknown) => {
       assertId(id)

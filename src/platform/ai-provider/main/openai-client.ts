@@ -32,6 +32,12 @@ export function normalizeAiBaseUrl(input: string): string {
   return url.toString().replace(/\/$/, '')
 }
 
+export function createOpenAiRequestHeaders(provider: Pick<ResolvedAiProvider, 'apiKey'> & { customHeaders?: Record<string, string> }): Headers {
+  const headers = new Headers({ 'Content-Type': 'application/json', Authorization: `Bearer ${provider.apiKey}` })
+  for (const [name, value] of Object.entries(provider.customHeaders ?? {})) headers.set(name, value)
+  return headers
+}
+
 function valueKind(value: unknown): string {
   if (value === null) return 'null'
   if (Array.isArray(value)) return 'array'
@@ -117,7 +123,7 @@ export async function testOpenAiProvider(
   try {
     response = await fetchImpl(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${provider.apiKey}` },
+      headers: createOpenAiRequestHeaders(provider),
       body: JSON.stringify({
         model: provider.modelId,
         temperature: 0,

@@ -14,6 +14,7 @@ const provider: ResolvedAiProvider = {
   modelId: 'test-model',
   useSystemProxy: false,
   apiKey: 'secret',
+  customHeaders: {},
   identityFingerprint: 'identity-fingerprint',
   credentialFingerprint: 'credential-fingerprint'
 }
@@ -27,6 +28,16 @@ function captureLogger(): { events: AiProviderTestLogEvent[]; logger: AiProvider
 }
 
 describe('AI Provider 连接测试日志', () => {
+  it('allows Provider custom headers to override default authentication and content type', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ choices: [] }))
+    await testOpenAiProvider({ ...provider, customHeaders: { Authorization: 'Gateway token', 'Content-Type': 'application/custom+json', 'X-Gateway': 'restx' } }, fetchImpl)
+    const request = fetchImpl.mock.calls[0][1]
+    const headers = new Headers(request?.headers)
+    expect(headers.get('authorization')).toBe('Gateway token')
+    expect(headers.get('content-type')).toBe('application/custom+json')
+    expect(headers.get('x-gateway')).toBe('restx')
+  })
+
   it('网络失败时记录错误类别，且不记录凭据或代理地址', async () => {
     const { events, logger } = captureLogger()
     const fetchImpl = vi.fn<typeof fetch>().mockRejectedValue(new TypeError('connect proxy.local:8080 failed'))

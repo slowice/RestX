@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { createOpenAiRequestHeaders } from '../../../../platform/ai-provider/main/openai-client'
 import type { AiAnalysisItem, AiAnalysisRisk, AiAnalysisSection, AiConfigAnalysis } from '../../shared/contracts/ai-capability'
 import type { ConfigDocument } from '../../shared/contracts/config'
 import { formatLogTimestamp, type AiCallLogEvent, type AiCallLogger } from './ai-call-logger'
@@ -17,6 +18,7 @@ export type ProviderSecretSettings = {
   baseUrl: string
   model: string
   apiKey: string
+  customHeaders?: Record<string, string>
 }
 
 type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
@@ -275,10 +277,7 @@ export async function analyzeWithOpenAiCompatible({
   try {
     response = await fetchImpl(endpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${settings.apiKey}`
-      },
+      headers: createOpenAiRequestHeaders(settings),
       body,
       signal: AbortSignal.timeout(180_000)
     })

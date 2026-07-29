@@ -24,12 +24,12 @@ const initialState: AiProviderState = {
   providers: [
     {
       id: 'manual-1', name: 'Google', source: 'manual', baseUrl: 'https://google.example/v1',
-      modelId: 'gemini', useSystemProxy: false, apiKeyConfigured: true, status: 'ready',
+      modelId: 'gemini', useSystemProxy: false, customHeaders: {}, apiKeyConfigured: true, status: 'ready',
       active: true, editable: true, identityFingerprint: 'manual-identity'
     },
     {
       id: 'claude-1', name: 'Claude Code', source: 'claude-code', baseUrl: 'https://claude.example/v1',
-      modelId: 'claude', useSystemProxy: false, apiKeyConfigured: true, status: 'ready',
+      modelId: 'claude', useSystemProxy: false, customHeaders: {}, apiKeyConfigured: true, status: 'ready',
       active: false, editable: false, identityFingerprint: 'claude-identity'
     }
   ]
@@ -40,6 +40,12 @@ function installApi(): RestXApi {
     ...initialState,
     providers: initialState.providers.map((provider) =>
       provider.id === id ? { ...provider, useSystemProxy: enabled } : provider
+    )
+  }))
+  const setCustomHeaders = vi.fn(async (id: string, headers: Array<{ name: string; value: string }>): Promise<AiProviderState> => ({
+    ...initialState,
+    providers: initialState.providers.map((provider) =>
+      provider.id === id ? { ...provider, customHeaders: Object.fromEntries(headers.filter((header) => header.name).map(({ name, value }) => [name, value])) } : provider
     )
   }))
   const api: RestXApi = {
@@ -56,6 +62,7 @@ function installApi(): RestXApi {
       delete: vi.fn(),
       setActive: vi.fn(),
       setSystemProxy,
+      setCustomHeaders,
       test: vi.fn(),
       refreshExternal: vi.fn()
     },
@@ -98,5 +105,18 @@ describe('SettingsPage Provider proxy preference', () => {
 
     await waitFor(() => expect(api.providers.setSystemProxy).toHaveBeenCalledWith('claude-1', true))
     expect(screen.getByRole('switch', { name: '为 Claude Code 使用系统代理' })).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('edits RestX-managed request headers for an external Provider', async () => {
+    const api = installApi()
+    render(<SettingsPage />)
+
+    await screen.findByText('Claude Code')
+    fireEvent.click(screen.getByRole('button', { name: '配置 Claude Code 的自定义请求头' }))
+    fireEvent.change(screen.getByLabelText('请求头名称 1'), { target: { value: 'Authorization' } })
+    fireEvent.change(screen.getByLabelText('请求头值 1'), { target: { value: 'Gateway token' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存请求头' }))
+
+    await waitFor(() => expect(api.providers.setCustomHeaders).toHaveBeenCalledWith('claude-1', [{ name: 'Authorization', value: 'Gateway token' }]))
   })
 })

@@ -9,6 +9,16 @@ import { composeApiContributions, createPlatformApi } from '../src/platform/prel
 import { platformChannels } from '../src/platform/shared/platform-api'
 
 describe('preload API composition', () => {
+  it('exposes the fixed custom-header channel', async () => {
+    const calls = vi.fn()
+    const api = createPlatformApi(async <T>(channel: string, ...args: unknown[]): Promise<T> => {
+      calls(channel, ...args)
+      return undefined as T
+    })
+    await api.providers.setCustomHeaders('provider-1', [{ name: 'X-Gateway', value: 'restx' }])
+    expect(calls).toHaveBeenCalledWith(platformChannels.setProviderCustomHeaders, 'provider-1', [{ name: 'X-Gateway', value: 'restx' }])
+  })
+
   it('deep-merges platform and feature methods while keeping fixed channels', async () => {
     const calls = vi.fn()
     const invoke: PreloadInvoke = async <T>(channel: string, ...args: unknown[]): Promise<T> => {
