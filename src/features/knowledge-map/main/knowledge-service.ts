@@ -1,5 +1,5 @@
 import { mkdir } from 'node:fs/promises'
-import type { ResolvedAiProvider } from '../../../platform/ai-provider/shared/contracts'
+import type { AiProviderExecutionContext } from '../../../platform/ai-provider/shared/contracts'
 import type {
   ApplyKnowledgeClassificationInput,
   KnowledgeClassificationSuggestion,
@@ -16,7 +16,7 @@ import { parseKnowledgeMarkdown, type ParsedKnowledgeMarkdown } from './services
 import { applyKnowledgeClassification } from './services/markdown-writer'
 import { scanKnowledgeRoot } from './services/knowledge-scanner'
 
-type ExecuteActive = <T>(operation: (provider: ResolvedAiProvider) => Promise<T>) => Promise<T>
+type ExecuteActive = <T>(operation: (context: AiProviderExecutionContext) => Promise<T>) => Promise<T>
 
 type KnowledgeServiceDependencies = {
   root: string
@@ -73,13 +73,13 @@ export class KnowledgeService {
       throw new KnowledgeServiceError('请先修复问题文件的 Frontmatter。', 'INVALID_FRONTMATTER')
     }
     const result = this.latestResult ?? await this.scan()
-    return this.dependencies.executeActive((provider) => classifyKnowledgeProblem({
+    return this.dependencies.executeActive(({ provider, fetch }) => classifyKnowledgeProblem({
       problemId,
       sourceFingerprint: parsed.summary.sourceFingerprint,
       markdown: parsed.body,
       catalog: result.catalog,
       provider,
-      fetchImpl: this.dependencies.fetchImpl
+      fetchImpl: this.dependencies.fetchImpl ?? fetch
     }))
   }
 

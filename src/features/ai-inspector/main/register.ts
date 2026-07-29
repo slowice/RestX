@@ -79,10 +79,11 @@ const analysisService = new ConfigAnalysisService({
     return state.providers.find((provider) => provider.id === state.activeProviderId) ?? null
   },
   isConsentEnabled: () => preferences.get().aiLocalAnalysisEnabled,
-  analyzeProvider: (document, providerId) => aiProviderRegistry.execute(providerId, async (provider) => ({
+  analyzeProvider: (document, providerId) => aiProviderRegistry.execute(providerId, async ({ provider, fetch }) => ({
     result: await analyzeWithOpenAiCompatible({
       settings: { baseUrl: provider.baseUrl, model: provider.modelId, apiKey: provider.apiKey },
       document,
+      fetchImpl: fetch,
       logger: aiCallLogger
     }),
     modelId: provider.modelId

@@ -24,7 +24,7 @@ function makeApi(): RestXApi {
   return {
     inspector: { chooseDirectory: vi.fn(), scanDirectory: vi.fn(), readConfig: vi.fn(), readJsonlPage: vi.fn(), readJsonlEntry: vi.fn(), searchJsonlWorkspace: vi.fn(), revealInFolder: vi.fn() },
     app: { getVersion: vi.fn(), getPreferences: vi.fn(), setAiLocalAnalysisEnabled: vi.fn(), clearHistory: vi.fn() },
-    providers: { getState: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(), setActive: vi.fn(), test: vi.fn(), refreshExternal: vi.fn() },
+    providers: { getState: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(), setActive: vi.fn(), setSystemProxy: vi.fn(), test: vi.fn(), refreshExternal: vi.fn() },
     ai: { analyzeConfig: vi.fn(), getCachedAnalysis: vi.fn(), clearAnalysisCache: vi.fn() },
     presets: { list: vi.fn(), generateDraft: vi.fn(), save: vi.fn(), setEnabled: vi.fn(), delete: vi.fn() },
     codeReview: {

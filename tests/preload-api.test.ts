@@ -21,6 +21,7 @@ describe('preload API composition', () => {
     ]) as RestXApi
 
     await api.app.getVersion()
+    await api.providers.setSystemProxy('provider-1', true)
     await api.app.getPreferences()
     await api.inspector.chooseDirectory()
     await api.codeReview.listMyGitCodeMergeRequests()
@@ -30,13 +31,14 @@ describe('preload API composition', () => {
     await api.mailTemplates.importMessage()
 
     expect(calls).toHaveBeenNthCalledWith(1, platformChannels.getVersion)
-    expect(calls).toHaveBeenNthCalledWith(2, aiInspectorChannels.getPreferences)
-    expect(calls).toHaveBeenNthCalledWith(3, aiInspectorChannels.chooseDirectory)
-    expect(calls).toHaveBeenNthCalledWith(4, codeReviewChannels.listMyGitCodeMergeRequests)
-    expect(calls).toHaveBeenNthCalledWith(5, codeReviewChannels.getGitCodeSettings)
-    expect(calls).toHaveBeenNthCalledWith(6, codeReviewChannels.getCodeHubSettings)
-    expect(calls).toHaveBeenNthCalledWith(7, mailTemplateChannels.openDraft, { to: ['user@example.com'], cc: [], bcc: [], subject: '主题', body: '正文' })
-    expect(calls).toHaveBeenNthCalledWith(8, mailTemplateChannels.importMessage)
+    expect(calls).toHaveBeenNthCalledWith(2, platformChannels.setProviderSystemProxy, 'provider-1', true)
+    expect(calls).toHaveBeenNthCalledWith(3, aiInspectorChannels.getPreferences)
+    expect(calls).toHaveBeenNthCalledWith(4, aiInspectorChannels.chooseDirectory)
+    expect(calls).toHaveBeenNthCalledWith(5, codeReviewChannels.listMyGitCodeMergeRequests)
+    expect(calls).toHaveBeenNthCalledWith(6, codeReviewChannels.getGitCodeSettings)
+    expect(calls).toHaveBeenNthCalledWith(7, codeReviewChannels.getCodeHubSettings)
+    expect(calls).toHaveBeenNthCalledWith(8, mailTemplateChannels.openDraft, { to: ['user@example.com'], cc: [], bcc: [], subject: '主题', body: '正文' })
+    expect(calls).toHaveBeenNthCalledWith(9, mailTemplateChannels.importMessage)
   })
 
   it('rejects duplicate API methods', () => {

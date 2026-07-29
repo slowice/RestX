@@ -13,6 +13,7 @@ export const platformChannels = {
   updateProvider: 'platform:ai-provider:update',
   deleteProvider: 'platform:ai-provider:delete',
   setActiveProvider: 'platform:ai-provider:set-active',
+  setProviderSystemProxy: 'platform:ai-provider:set-system-proxy',
   testProvider: 'platform:ai-provider:test',
   refreshExternalProviders: 'platform:ai-provider:refresh-external'
 } as const

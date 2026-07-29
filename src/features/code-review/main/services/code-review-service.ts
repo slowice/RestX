@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { CodeReviewResult, GitCodeConnectionStatus, GitCodeMergeRequestList, PreviewReviewSourceInput, ReviewFinding, ReviewSourcePreview, RunCodeReviewInput } from '../../shared/contracts/code-review'
-import type { AiProviderPublic, ResolvedAiProvider } from '../../../../platform/ai-provider/shared/contracts'
+import type { AiProviderExecutionContext, AiProviderPublic } from '../../../../platform/ai-provider/shared/contracts'
 import { aiProviderRegistry } from '../../../../platform/ai-provider/main/provider-registry'
 import { CodeHubAdapter } from './codehub-adapter'
 import { buildReviewBatches, CODE_REVIEW_PROMPT_VERSION, reviewCodeBatch } from './code-review-provider'
@@ -19,7 +19,7 @@ export class CodeReviewService {
     private readonly readGitEmail: () => Promise<string | null> = readGlobalGitEmail,
     private readonly providers: {
       getActivePublic(): Promise<AiProviderPublic>
-      execute<T>(id: string, operation: (provider: ResolvedAiProvider) => Promise<T>): Promise<T>
+      execute<T>(id: string, operation: (context: AiProviderExecutionContext) => Promise<T>): Promise<T>
     } = aiProviderRegistry
   ) {}
 
@@ -71,9 +71,9 @@ export class CodeReviewService {
     let usedModel = provider.modelId
     try {
       for (const batch of batches) {
-        const response = await this.providers.execute(provider.id, (resolved) => {
+        const response = await this.providers.execute(provider.id, ({ provider: resolved, fetch }) => {
           usedModel = resolved.modelId
-          return reviewCodeBatch({ settings: { baseUrl: resolved.baseUrl, model: resolved.modelId, apiKey: resolved.apiKey }, batch, rulePacks, requirements: input.requirements, sourceSummary: { title: source.preview.title, repository: `${locator.owner}/${locator.repository}`, baseBranch: source.preview.baseBranch, headBranch: source.preview.headBranch } })
+          return reviewCodeBatch({ settings: { baseUrl: resolved.baseUrl, model: resolved.modelId, apiKey: resolved.apiKey }, batch, rulePacks, requirements: input.requirements, sourceSummary: { title: source.preview.title, repository: `${locator.owner}/${locator.repository}`, baseBranch: source.preview.baseBranch, headBranch: source.preview.headBranch }, fetchImpl: fetch })
         })
         summaries.push(response.summary)
         findings.push(...response.findings)

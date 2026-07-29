@@ -138,8 +138,7 @@ export async function testOpenAiProvider(
       outcome: 'no_response',
       error: {
         name: error.name,
-        ...('code' in error && typeof error.code === 'string' ? { code: error.code } : {}),
-        message: error.message
+        ...('code' in error && typeof error.code === 'string' ? { code: error.code } : {})
       }
     })
     if ((reason as Error).name === 'TimeoutError' || (reason as Error).name === 'AbortError') {

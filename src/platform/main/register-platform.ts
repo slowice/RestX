@@ -54,6 +54,11 @@ export async function registerApplication(): Promise<() => void> {
       assertId(id)
       return aiProviderRegistry.setActive(id)
     })
+    ipc.handle(platformChannels.setProviderSystemProxy, (_event, id: unknown, enabled: unknown) => {
+      assertId(id)
+      if (typeof enabled !== 'boolean') throw new Error('系统代理参数无效。')
+      return aiProviderRegistry.setSystemProxy(id, enabled)
+    })
     ipc.handle(platformChannels.testProvider, (_event, id: unknown) => {
       assertId(id)
       return aiProviderRegistry.test(id)

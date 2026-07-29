@@ -15,6 +15,7 @@ export function createPlatformApi(invoke: PreloadInvoke): PlatformApi {
       update: (input) => invoke(platformChannels.updateProvider, input),
       delete: (id) => invoke(platformChannels.deleteProvider, id),
       setActive: (id) => invoke(platformChannels.setActiveProvider, id),
+      setSystemProxy: (id, enabled) => invoke(platformChannels.setProviderSystemProxy, id, enabled),
       test: (id) => invoke(platformChannels.testProvider, id),
       refreshExternal: () => invoke(platformChannels.refreshExternalProviders)
     }

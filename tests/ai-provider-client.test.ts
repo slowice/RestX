@@ -12,6 +12,7 @@ const provider: ResolvedAiProvider = {
   source: 'manual',
   baseUrl: 'https://example.com/v1',
   modelId: 'test-model',
+  useSystemProxy: false,
   apiKey: 'secret',
   identityFingerprint: 'identity-fingerprint',
   credentialFingerprint: 'credential-fingerprint'
@@ -26,9 +27,9 @@ function captureLogger(): { events: AiProviderTestLogEvent[]; logger: AiProvider
 }
 
 describe('AI Provider 连接测试日志', () => {
-  it('网络失败时记录未收到模型响应，且不记录凭据', async () => {
+  it('网络失败时记录错误类别，且不记录凭据或代理地址', async () => {
     const { events, logger } = captureLogger()
-    const fetchImpl = vi.fn<typeof fetch>().mockRejectedValue(new TypeError('fetch failed'))
+    const fetchImpl = vi.fn<typeof fetch>().mockRejectedValue(new TypeError('connect proxy.local:8080 failed'))
 
     await expect(testOpenAiProvider(provider, fetchImpl, logger)).rejects.toMatchObject({
       code: 'CONNECTION_FAILED'
@@ -39,9 +40,10 @@ describe('AI Provider 连接测试日志', () => {
       outcome: 'no_response',
       providerId: 'provider-1',
       model: 'test-model',
-      error: { name: 'TypeError', message: 'fetch failed' }
+      error: { name: 'TypeError' }
     })
     expect(JSON.stringify(events[0])).not.toContain(provider.apiKey)
+    expect(JSON.stringify(events[0])).not.toContain('proxy.local')
   })
 
   it('收到非 JSON 响应时记录实际结构和错误位置', async () => {

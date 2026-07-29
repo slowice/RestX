@@ -144,12 +144,15 @@ export async function generateSmartPresetDraft(
     userPayload = JSON.stringify(payload)
   }
   if (userPayload.length > MAX_INPUT_CHARACTERS) throw new ProviderError('导入线索过大，请精简备注后重试。', 'INPUT_TOO_LARGE')
-  const request = (settings: ProviderSecretSettings) => requestDraft({
-    settings, userPayload, fetchImpl: dependencies.fetchImpl, logger: dependencies.logger
+  const request = (settings: ProviderSecretSettings, fetchImpl = dependencies.fetchImpl) => requestDraft({
+    settings, userPayload, fetchImpl, logger: dependencies.logger
   })
   const content = dependencies.settings
     ? await request(dependencies.settings)
-    : await aiProviderRegistry.executeActive((provider) => request({ baseUrl: provider.baseUrl, model: provider.modelId, apiKey: provider.apiKey }))
+    : await aiProviderRegistry.executeActive(({ provider, fetch }) => request(
+      { baseUrl: provider.baseUrl, model: provider.modelId, apiKey: provider.apiKey },
+      fetch
+    ))
   const parsed = parseModelDraft(content)
   const trialResult = await discoverAiTools(input.rootPath, { maxFiles: 10_000, maxFileSizeBytes: 20 * 1024 * 1024 }, [parsed.preset])
   const tool = trialResult.tools[0]

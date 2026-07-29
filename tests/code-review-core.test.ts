@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ResolvedAiProvider } from '../src/platform/ai-provider/shared/contracts'
+import type { AiProviderExecutionContext } from '../src/platform/ai-provider/shared/contracts'
 import type { CodeReviewResult } from '../src/features/code-review/shared/contracts/code-review'
 import { CodeReviewCache, type ReviewCacheCrypto, type ReviewCacheStorage } from '../src/features/code-review/main/services/code-review-cache'
 import { parseCodeReviewResponse } from '../src/features/code-review/main/services/code-review-provider'
@@ -96,11 +96,14 @@ describe('review cache and zone enforcement', () => {
     let providerCalls = 0
     let apiKey = 'provider-key-one'
     const providers = {
-      getActivePublic: async () => ({ id: 'shared', name: 'Shared', source: 'manual' as const, baseUrl: 'https://ai.example/v1', modelId: 'common-model', apiKeyConfigured: true, status: 'ready' as const, active: true, editable: true, identityFingerprint: 'stable-model-identity' }),
-      execute: async <T>(id: string, operation: (provider: ResolvedAiProvider) => Promise<T>): Promise<T> => {
+      getActivePublic: async () => ({ id: 'shared', name: 'Shared', source: 'manual' as const, baseUrl: 'https://ai.example/v1', modelId: 'common-model', useSystemProxy: false, apiKeyConfigured: true, status: 'ready' as const, active: true, editable: true, identityFingerprint: 'stable-model-identity' }),
+      execute: async <T>(id: string, operation: (context: AiProviderExecutionContext) => Promise<T>): Promise<T> => {
         expect(id).toBe('shared')
         providerCalls += 1
-        return operation({ id: 'shared', name: 'Shared', source: 'manual', baseUrl: 'https://ai.example/v1', modelId: 'common-model', apiKey, identityFingerprint: 'stable-model-identity', credentialFingerprint: apiKey })
+        return operation({
+          provider: { id: 'shared', name: 'Shared', source: 'manual', baseUrl: 'https://ai.example/v1', modelId: 'common-model', useSystemProxy: false, apiKey, identityFingerprint: 'stable-model-identity', credentialFingerprint: apiKey },
+          fetch
+        })
       }
     }
     const service = new CodeReviewService(cache, adapter, async () => null, providers)

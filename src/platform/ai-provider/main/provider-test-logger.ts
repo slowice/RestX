@@ -25,7 +25,7 @@ export type AiProviderTestLogEvent = {
   outcome: 'no_response' | 'http_error' | 'invalid_response'
   httpStatus?: number
   response?: AiProviderResponseSummary
-  error?: { name: string; code?: string; message: string }
+  error?: { name: string; code?: string; message?: string }
 }
 
 export interface AiProviderTestLogger {

@@ -35,7 +35,7 @@ function makeHarness(overrides: { consent?: boolean; sourceHash?: string; model?
   const service = new ConfigAnalysisService({
     cache,
     readDocument: async () => document,
-    getProviderPublic: () => ({ id: providerId, name: 'Demo', source: 'manual', baseUrl: 'https://example.com/v1', modelId: model, apiKeyConfigured: true, status: 'ready', active: true, editable: true, identityFingerprint: `${providerId}:${model}` }),
+    getProviderPublic: () => ({ id: providerId, name: 'Demo', source: 'manual', baseUrl: 'https://example.com/v1', modelId: model, useSystemProxy: false, apiKeyConfigured: true, status: 'ready', active: true, editable: true, identityFingerprint: `${providerId}:${model}` }),
     isConsentEnabled: () => overrides.consent ?? true,
     analyzeProvider: async (document, providerId) => {
       void document

@@ -77,7 +77,7 @@ function makeApi(): RestXApi {
       getPreferences: vi.fn(async () => ({ recentDirectory: '/Users/demo', aiLocalAnalysisEnabled: false })),
       setAiLocalAnalysisEnabled: vi.fn(), clearHistory: vi.fn()
     },
-    providers: { getState: vi.fn(async () => ({ providers: [], activeProviderId: null })), create: vi.fn(), update: vi.fn(), delete: vi.fn(), setActive: vi.fn(), test: vi.fn(), refreshExternal: vi.fn() },
+    providers: { getState: vi.fn(async () => ({ providers: [], activeProviderId: null })), create: vi.fn(), update: vi.fn(), delete: vi.fn(), setActive: vi.fn(), setSystemProxy: vi.fn(), test: vi.fn(), refreshExternal: vi.fn() },
     ai: {
       analyzeConfig: vi.fn(), getCachedAnalysis: vi.fn(async (): Promise<CachedAnalysisResponse> => ({ status: 'none', record: null })), clearAnalysisCache: vi.fn()
     },

@@ -58,6 +58,20 @@ export function SettingsPage(): React.JSX.Element {
     } catch (reason) { setNotice({ kind: 'error', text: errorMessage(reason) }) } finally { setBusy(null) }
   }
 
+  const setSystemProxy = async (provider: AiProviderPublic): Promise<void> => {
+    setBusy(`proxy:${provider.id}`)
+    setNotice(null)
+    try {
+      const enabled = !provider.useSystemProxy
+      setProviders(await window.restx.providers.setSystemProxy(provider.id, enabled))
+      setNotice({ kind: 'success', text: `已${enabled ? '开启' : '关闭'} ${provider.name} 的系统代理。` })
+    } catch (reason) {
+      setNotice({ kind: 'error', text: errorMessage(reason) })
+    } finally {
+      setBusy(null)
+    }
+  }
+
   const testProvider = async (id: string): Promise<void> => {
     setBusy(`test:${id}`)
     try {
@@ -112,7 +126,25 @@ export function SettingsPage(): React.JSX.Element {
           {providers.providers.map((provider) => <article className={`provider-card${provider.active ? ' active' : ''}`} key={provider.id}>
             <button className="provider-select" type="button" disabled={provider.status !== 'ready' || busy !== null} onClick={() => void selectProvider(provider.id)} aria-label={`使用 ${provider.name}`}><span>{provider.active && <CircleCheck size={16} />}</span></button>
             <div className="provider-card-main"><header><strong>{provider.name}</strong><em className={provider.source}>{provider.source === 'claude-code' ? 'CLAUDE CODE' : 'MANUAL'}</em><i className={provider.status}>{provider.status === 'ready' ? '可用' : provider.status === 'unavailable' ? '不可用' : '未完成'}</i></header><span>{provider.baseUrl}</span><code>{provider.modelId}</code>{provider.statusMessage && <small>{provider.statusMessage}</small>}</div>
-            <div className="provider-card-actions"><button className="button compact secondary" disabled={busy !== null || provider.status !== 'ready'} onClick={() => void testProvider(provider.id)}><Zap size={13} />{busy === `test:${provider.id}` ? '测试中…' : '测试'}</button>{provider.editable && <button className="icon-button" aria-label={`编辑 ${provider.name}`} onClick={() => beginEdit(provider)}><Pencil size={14} /></button>}{provider.editable && <button className="icon-button danger" aria-label={`删除 ${provider.name}`} disabled={busy !== null} onClick={() => void deleteProvider(provider)}><Trash2 size={14} /></button>}</div>
+            <div className="provider-card-actions">
+              <div className="provider-proxy-control">
+                <span>系统代理</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-label={`为 ${provider.name} 使用系统代理`}
+                  aria-checked={provider.useSystemProxy}
+                  className={`switch compact-switch ${provider.useSystemProxy ? 'on' : ''}`}
+                  disabled={busy !== null}
+                  onClick={() => void setSystemProxy(provider)}
+                >
+                  <span />
+                </button>
+              </div>
+              <button className="button compact secondary" disabled={busy !== null || provider.status !== 'ready'} onClick={() => void testProvider(provider.id)}><Zap size={13} />{busy === `test:${provider.id}` ? '测试中…' : '测试'}</button>
+              {provider.editable && <button className="icon-button" aria-label={`编辑 ${provider.name}`} onClick={() => beginEdit(provider)}><Pencil size={14} /></button>}
+              {provider.editable && <button className="icon-button danger" aria-label={`删除 ${provider.name}`} disabled={busy !== null} onClick={() => void deleteProvider(provider)}><Trash2 size={14} /></button>}
+            </div>
           </article>)}
         </div>
         {editor && <form className="provider-editor" onSubmit={(event) => void saveProvider(event)}><div className="provider-editor-head"><div><strong>{editor === 'new' ? '新增 Provider' : '编辑 Provider'}</strong><span>API Key 只在主进程中加密保存。</span></div><button className="button compact secondary" type="button" onClick={() => setEditor(null)}>取消</button></div><div className="provider-editor-fields"><label><span><Bot size={13} />名称</span><input required maxLength={120} value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="例如 智谱 GLM" /></label><label><span><Server size={13} />Base URL</span><input type="url" required value={draft.baseUrl} onChange={(event) => setDraft({ ...draft, baseUrl: event.target.value })} placeholder="https://api.example.com/v1" /></label><label><span><Bot size={13} />模型 ID</span><input required value={draft.modelId} onChange={(event) => setDraft({ ...draft, modelId: event.target.value })} placeholder="GLM5.1" /></label><label><span><KeyRound size={13} />API Key</span><input type="password" required={editor === 'new'} autoComplete="new-password" value={draft.apiKey} onChange={(event) => setDraft({ ...draft, apiKey: event.target.value })} placeholder={editor === 'new' ? '输入 API Key' : '留空表示保持不变'} /></label></div><div className="provider-actions"><button className="button primary" type="submit" disabled={busy !== null}>{busy === 'save' ? '保存中…' : '保存 Provider'}</button></div></form>}

@@ -29,6 +29,7 @@ const provider: ResolvedAiProvider = {
   source: 'manual',
   baseUrl: 'https://example.test/v1',
   modelId: 'test-model',
+  useSystemProxy: false,
   apiKey: 'secret',
   identityFingerprint: 'identity',
   credentialFingerprint: 'credential'

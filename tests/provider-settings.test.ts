@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -51,21 +51,54 @@ describe('AiProviderRegistry', () => {
 
   it('imports Claude Code once, defaults the model, and does not persist its token', async () => {
     const storage = new MemoryStorage()
-    const config: ClaudeCodeConfig = { sourcePath: '/Users/demo/.claude/settings.json', baseUrl: 'https://claude.example/v1', modelId: 'GLM5.1', apiKey: 'rotating-token', fileSignature: '1:100' }
+    let config: ClaudeCodeConfig = { sourcePath: '/Users/demo/.claude/settings.json', baseUrl: 'https://claude.example/v1', modelId: 'GLM5.1', apiKey: 'rotating-token', fileSignature: '1:100' }
     const registry = new AiProviderRegistry(storage, { crypto, readClaudeCode: async () => config })
     await registry.initialize()
     await registry.initialize()
-    const state = await registry.getState()
+    let state = await registry.getState()
     expect(state.providers).toHaveLength(1)
-    expect(state.providers[0]).toMatchObject({ source: 'claude-code', modelId: 'GLM5.1', active: true })
+    expect(state.providers[0]).toMatchObject({ source: 'claude-code', modelId: 'GLM5.1', active: true, useSystemProxy: false })
     expect(JSON.stringify([...storage.values])).not.toContain('rotating-token')
+
+    await registry.setSystemProxy(state.providers[0].id, true)
+    config = { ...config, fileSignature: '2:100' }
+    state = await registry.refreshExternal()
+    expect(state.providers[0].useSystemProxy).toBe(true)
+  })
+
+  it('persists an independent system proxy preference and injects the matching request function', async () => {
+    const directFetch = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ ok: true }))
+    const systemFetch = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ ok: true }))
+    const registry = new AiProviderRegistry(new MemoryStorage(), {
+      crypto,
+      readClaudeCode: async () => null,
+      fetchImpl: directFetch,
+      systemFetchImpl: systemFetch
+    })
+    const created = await registry.create({
+      name: 'Google',
+      baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+      modelId: 'gemini',
+      apiKey: 'secret'
+    })
+    const id = created.activeProviderId!
+    expect(created.providers[0].useSystemProxy).toBe(false)
+    const fingerprint = created.providers[0].identityFingerprint
+
+    await registry.executeActive(({ fetch }) => fetch('https://example.test/direct'))
+    const updated = await registry.setSystemProxy(id, true)
+    await registry.executeActive(({ fetch }) => fetch('https://example.test/proxy'))
+
+    expect(updated.providers[0]).toMatchObject({ useSystemProxy: true, identityFingerprint: fingerprint })
+    expect(directFetch).toHaveBeenCalledTimes(1)
+    expect(systemFetch).toHaveBeenCalledTimes(1)
   })
 
   it('refreshes a rotating Claude token and retries authentication only once', async () => {
     let config: ClaudeCodeConfig = { sourcePath: '/Users/demo/.claude/settings.json', baseUrl: 'https://claude.example/v1', modelId: 'demo', apiKey: 'token-one', fileSignature: '1:100' }
     const registry = new AiProviderRegistry(new MemoryStorage(), { crypto, readClaudeCode: async () => config })
     const attemptedKeys: string[] = []
-    const result = await registry.executeActive(async (provider) => {
+    const result = await registry.executeActive(async ({ provider }) => {
       attemptedKeys.push(provider.apiKey)
       if (attemptedKeys.length === 1) {
         config = { ...config, apiKey: 'token-two', fileSignature: '2:100' }

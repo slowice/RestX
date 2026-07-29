@@ -8,6 +8,7 @@ export type AiProviderPublic = {
   source: AiProviderSource
   baseUrl: string
   modelId: string
+  useSystemProxy: boolean
   apiKeyConfigured: boolean
   status: AiProviderStatus
   statusMessage?: string
@@ -49,6 +50,7 @@ export type AiProviderApi = {
     update(input: UpdateAiProviderInput): Promise<AiProviderState>
     delete(id: string): Promise<AiProviderState>
     setActive(id: string): Promise<AiProviderState>
+    setSystemProxy(id: string, enabled: boolean): Promise<AiProviderState>
     test(id: string): Promise<AiProviderTestResult>
     refreshExternal(): Promise<AiProviderState>
   }
@@ -60,7 +62,13 @@ export type ResolvedAiProvider = {
   source: AiProviderSource
   baseUrl: string
   modelId: string
+  useSystemProxy: boolean
   apiKey: string
   identityFingerprint: string
   credentialFingerprint: string
+}
+
+export type AiProviderExecutionContext = {
+  provider: ResolvedAiProvider
+  fetch: typeof fetch
 }

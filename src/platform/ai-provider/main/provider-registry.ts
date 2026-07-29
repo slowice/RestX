@@ -2,11 +2,12 @@ import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { safeStorage } from 'electron'
+import { net, safeStorage } from 'electron'
 import Store from 'electron-store'
 import { getRestxStorageLayout } from '../../main/storage'
 import type {
   AiProviderPublic,
+  AiProviderExecutionContext,
   AiProviderState,
   AiProviderTestResult,
   CreateAiProviderInput,
@@ -24,6 +25,7 @@ type StoredProvider = {
   source: 'manual' | 'claude-code'
   baseUrl: string
   modelId: string
+  useSystemProxy?: boolean
   encryptedApiKey?: string
   sourcePath?: string
   available?: boolean
@@ -73,7 +75,10 @@ type RegistryDependencies = {
   readLegacyProviders?(): LegacyProvider[]
   now?: () => Date
   fetchImpl?: typeof fetch
+  systemFetchImpl?: typeof fetch
 }
+
+const systemFetch: typeof fetch = (input, init) => net.fetch(input instanceof URL ? input.toString() : input, init)
 
 function requiredText(value: string, field: string, maxLength: number): string {
   const normalized = value.trim()
@@ -116,6 +121,7 @@ export class AiProviderRegistry {
       source: 'manual',
       baseUrl: normalizeAiBaseUrl(input.baseUrl),
       modelId: requiredText(input.modelId, '模型 ID', 300),
+      useSystemProxy: false,
       encryptedApiKey: this.dependencies.crypto.encrypt(apiKey),
       createdAt: now,
       updatedAt: now
@@ -168,11 +174,25 @@ export class AiProviderRegistry {
     return this.publicState()
   }
 
+  async setSystemProxy(id: string, enabled: boolean): Promise<AiProviderState> {
+    await this.initialize()
+    const providers = this.providers()
+    const index = providers.findIndex((provider) => provider.id === id)
+    if (index < 0) throw new AiProviderError('Provider 不存在。', 'NOT_FOUND')
+    providers[index] = {
+      ...providers[index],
+      useSystemProxy: enabled,
+      updatedAt: this.now().toISOString()
+    }
+    this.storage.set('providers', providers)
+    return this.publicState()
+  }
+
   async test(id: string): Promise<AiProviderTestResult> {
     await this.initialize()
     const startedAt = Date.now()
     try {
-      await this.executeProvider(id, (provider) => testOpenAiProvider(provider, this.dependencies.fetchImpl))
+      await this.executeProvider(id, ({ provider, fetch: fetchImpl }) => testOpenAiProvider(provider, fetchImpl))
       return { ok: true, message: '连接成功，OpenAI-compatible 响应正常。', durationMs: Date.now() - startedAt }
     } catch (reason) {
       return { ok: false, message: reason instanceof Error ? reason.message : '连接测试失败。', durationMs: Date.now() - startedAt }
@@ -199,28 +219,37 @@ export class AiProviderRegistry {
     return this.resolveSecret(this.find(id), false)
   }
 
-  async executeActive<T>(operation: (provider: ResolvedAiProvider) => Promise<T>): Promise<T> {
+  async executeActive<T>(operation: (context: AiProviderExecutionContext) => Promise<T>): Promise<T> {
     await this.initialize()
     const id = this.activeProviderId()
     if (!id) throw new AiProviderError('请先新增并选择一个 AI Provider。', 'INVALID_SETTINGS')
     return this.executeProvider(id, operation)
   }
 
-  async execute<T>(id: string, operation: (provider: ResolvedAiProvider) => Promise<T>): Promise<T> {
+  async execute<T>(id: string, operation: (context: AiProviderExecutionContext) => Promise<T>): Promise<T> {
     await this.initialize()
     return this.executeProvider(id, operation)
   }
 
-  private async executeProvider<T>(id: string, operation: (provider: ResolvedAiProvider) => Promise<T>): Promise<T> {
+  private async executeProvider<T>(id: string, operation: (context: AiProviderExecutionContext) => Promise<T>): Promise<T> {
     const stored = this.find(id)
-    const first = await this.resolveSecret(stored, false)
+    const first = this.executionContext(await this.resolveSecret(stored, false))
     try {
       return await operation(first)
     } catch (reason) {
       if (stored.source !== 'claude-code' || errorCode(reason) !== 'AUTHENTICATION_FAILED') throw reason
-      const refreshed = await this.resolveSecret(stored, true)
-      if (refreshed.credentialFingerprint === first.credentialFingerprint) throw reason
+      const refreshed = this.executionContext(await this.resolveSecret(stored, true))
+      if (refreshed.provider.credentialFingerprint === first.provider.credentialFingerprint) throw reason
       return operation(refreshed)
+    }
+  }
+
+  private executionContext(provider: ResolvedAiProvider): AiProviderExecutionContext {
+    return {
+      provider,
+      fetch: provider.useSystemProxy
+        ? this.dependencies.systemFetchImpl ?? systemFetch
+        : this.dependencies.fetchImpl ?? fetch
     }
   }
 
@@ -246,6 +275,7 @@ export class AiProviderRegistry {
       source: provider.source,
       baseUrl: provider.baseUrl,
       modelId: provider.modelId,
+      useSystemProxy: provider.useSystemProxy === true,
       apiKey,
       identityFingerprint: this.identityFingerprint(provider),
       credentialFingerprint
@@ -274,6 +304,7 @@ export class AiProviderRegistry {
       source: 'claude-code',
       baseUrl: normalizeAiBaseUrl(config.baseUrl),
       modelId: config.modelId.trim() || DEFAULT_MODEL_ID,
+      useSystemProxy: index >= 0 ? providers[index].useSystemProxy === true : false,
       sourcePath: path.resolve(config.sourcePath),
       available: true,
       createdAt: index >= 0 ? providers[index].createdAt : now,
@@ -337,6 +368,7 @@ export class AiProviderRegistry {
         source: provider.source,
         baseUrl: provider.baseUrl,
         modelId: provider.modelId,
+        useSystemProxy: provider.useSystemProxy === true,
         apiKeyConfigured: provider.source === 'claude-code' ? provider.available === true : Boolean(provider.encryptedApiKey),
         status: ready ? 'ready' : provider.source === 'claude-code' ? 'unavailable' : 'incomplete',
         ...(provider.statusMessage ? { statusMessage: provider.statusMessage } : {}),
@@ -453,10 +485,11 @@ export const aiProviderRegistry = {
   update: (input: UpdateAiProviderInput): Promise<AiProviderState> => (registryInstance ??= createDefaultRegistry()).update(input),
   delete: (id: string): Promise<AiProviderState> => (registryInstance ??= createDefaultRegistry()).delete(id),
   setActive: (id: string): Promise<AiProviderState> => (registryInstance ??= createDefaultRegistry()).setActive(id),
+  setSystemProxy: (id: string, enabled: boolean): Promise<AiProviderState> => (registryInstance ??= createDefaultRegistry()).setSystemProxy(id, enabled),
   test: (id: string): Promise<AiProviderTestResult> => (registryInstance ??= createDefaultRegistry()).test(id),
   refreshExternal: (): Promise<AiProviderState> => (registryInstance ??= createDefaultRegistry()).refreshExternal(),
   getActivePublic: (): Promise<AiProviderPublic> => (registryInstance ??= createDefaultRegistry()).getActivePublic(),
   getActiveSecret: (): Promise<ResolvedAiProvider> => (registryInstance ??= createDefaultRegistry()).getActiveSecret(),
-  executeActive: <T>(operation: (provider: ResolvedAiProvider) => Promise<T>): Promise<T> => (registryInstance ??= createDefaultRegistry()).executeActive(operation),
-  execute: <T>(id: string, operation: (provider: ResolvedAiProvider) => Promise<T>): Promise<T> => (registryInstance ??= createDefaultRegistry()).execute(id, operation)
+  executeActive: <T>(operation: (context: AiProviderExecutionContext) => Promise<T>): Promise<T> => (registryInstance ??= createDefaultRegistry()).executeActive(operation),
+  execute: <T>(id: string, operation: (context: AiProviderExecutionContext) => Promise<T>): Promise<T> => (registryInstance ??= createDefaultRegistry()).execute(id, operation)
 }
