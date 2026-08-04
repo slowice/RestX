@@ -82,7 +82,7 @@ function installApi(): RestXApi {
       getCodeHubSettings: vi.fn(), updateCodeHubSettings: vi.fn(), clearCache: vi.fn()
     },
     knowledge: {
-      scan: vi.fn(), read: vi.fn(), classify: vi.fn(), apply: vi.fn(), open: vi.fn(), openRoot: vi.fn()
+      scan: vi.fn(), read: vi.fn(), classify: vi.fn(), apply: vi.fn(), saveEdits: vi.fn(), open: vi.fn(), openRoot: vi.fn()
     },
     mailTemplates: {
       openDraft: vi.fn(), importMessage: vi.fn()

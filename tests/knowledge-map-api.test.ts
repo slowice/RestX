@@ -1,9 +1,11 @@
-import { mkdtemp, rm, symlink, unlink, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, rename, rm, symlink, unlink, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import type { RestXApi } from '../src/app-api'
 import { KnowledgeService } from '../src/features/knowledge-map/main/knowledge-service'
+import { applyKnowledgeEdits } from '../src/features/knowledge-map/main/services/markdown-writer'
+import { parseKnowledgeMarkdown } from '../src/features/knowledge-map/main/services/markdown-parser'
 import { knowledgeMapPreloadFeature } from '../src/features/knowledge-map/preload/api'
 import { knowledgeMapChannels } from '../src/features/knowledge-map/shared/channels'
 import type { PreloadInvoke } from '../src/platform/preload/define-feature'
@@ -35,11 +37,19 @@ describe('knowledge map API boundary', () => {
       capabilities: ['Capability'],
       knowledge: ['Knowledge']
     }
+    const editsInput = {
+      edits: [{
+        problemId: 'problem.md',
+        sourceFingerprint: 'a'.repeat(64),
+        classification: null
+      }]
+    }
 
     await api.knowledge.scan()
     await api.knowledge.read('problem.md')
     await api.knowledge.classify('problem.md')
     await api.knowledge.apply(input)
+    await api.knowledge.saveEdits(editsInput)
     await api.knowledge.open('problem.md')
     await api.knowledge.openRoot()
 
@@ -48,10 +58,11 @@ describe('knowledge map API boundary', () => {
       [knowledgeMapChannels.read, 'problem.md'],
       [knowledgeMapChannels.classify, 'problem.md'],
       [knowledgeMapChannels.apply, input],
+      [knowledgeMapChannels.saveEdits, editsInput],
       [knowledgeMapChannels.open, 'problem.md'],
       [knowledgeMapChannels.openRoot]
     ])
-    expect(Object.keys(api.knowledge).sort()).toEqual(['apply', 'classify', 'open', 'openRoot', 'read', 'scan'])
+    expect(Object.keys(api.knowledge).sort()).toEqual(['apply', 'classify', 'open', 'openRoot', 'read', 'saveEdits', 'scan'])
   })
 
   test('scan and read return relative identifiers without absolute paths', async () => {
@@ -133,5 +144,92 @@ describe('knowledge map API boundary', () => {
     await expect(service.read('problem.md')).rejects.toMatchObject({
       code: 'SOURCE_TOO_LARGE'
     })
+  })
+
+  test('saves several edits with backups and preserves unknown metadata and bodies', async () => {
+    const root = await createTemporaryRoot()
+    const firstPath = path.join(root, 'first.md')
+    const secondPath = path.join(root, 'second.md')
+    await writeFile(firstPath, `---\nowner: xubin\ntype: problem\nscene: Shared\ncapability: [Electron]\nknowledge: [IPC]\n---\n# First body\n`)
+    await writeFile(secondPath, `---\ntype: problem\nscene: Shared\ncapability: [Filesystem]\nknowledge: [YAML]\n---\n# Second body\n`)
+    const service = new KnowledgeService({ root, openPath: vi.fn(async () => ''), executeActive: vi.fn() })
+    const scan = await service.scan()
+
+    const next = await service.saveEdits({ edits: scan.problems.map((problem) => ({
+      problemId: problem.id,
+      sourceFingerprint: problem.sourceFingerprint,
+      classification: problem.id === 'first.md' ? null : {
+        scene: null,
+        capabilities: ['Filesystem'],
+        knowledge: ['YAML']
+      }
+    })) })
+
+    const first = await readFile(firstPath, 'utf8')
+    const second = await readFile(secondPath, 'utf8')
+    expect(first).toContain('owner: xubin')
+    expect(first).toContain('# First body')
+    expect(first).not.toContain('type: problem')
+    expect(second).toContain('capability:')
+    expect(second).not.toContain('scene:')
+    expect(next.problems.every((problem) => problem.status === 'pending')).toBe(true)
+    expect(next.problems.find((problem) => problem.id === 'second.md')?.classification).toEqual({
+      scene: null,
+      capabilities: ['Filesystem'],
+      knowledge: ['YAML']
+    })
+    expect(await readdir(path.join(root, '.restx-backup'))).toHaveLength(2)
+  })
+
+  test('rejects the whole batch when one fingerprint changed before writing', async () => {
+    const root = await createTemporaryRoot()
+    const firstPath = path.join(root, 'first.md')
+    const secondPath = path.join(root, 'second.md')
+    await writeFile(firstPath, '# First original')
+    await writeFile(secondPath, '# Second original')
+    const service = new KnowledgeService({ root, openPath: vi.fn(async () => ''), executeActive: vi.fn() })
+    const scan = await service.scan()
+    await writeFile(secondPath, '# Second changed externally')
+
+    await expect(service.saveEdits({ edits: scan.problems.map((problem) => ({
+      problemId: problem.id,
+      sourceFingerprint: problem.sourceFingerprint,
+      classification: { scene: 'Scene', capabilities: ['Capability'], knowledge: ['Knowledge'] }
+    })) })).rejects.toMatchObject({ code: 'SOURCE_CONFLICT' })
+
+    expect(await readFile(firstPath, 'utf8')).toBe('# First original')
+    await expect(readdir(path.join(root, '.restx-backup'))).rejects.toBeTruthy()
+  })
+
+  test('restores earlier replacements when a later batch rename fails', async () => {
+    const root = await createTemporaryRoot()
+    const firstPath = path.join(root, 'first.md')
+    const secondPath = path.join(root, 'second.md')
+    const firstOriginal = '# First original'
+    const secondOriginal = '# Second original'
+    await writeFile(firstPath, firstOriginal)
+    await writeFile(secondPath, secondOriginal)
+    const firstFingerprint = parseKnowledgeMarkdown(firstOriginal, 'first.md').summary.sourceFingerprint
+    const secondFingerprint = parseKnowledgeMarkdown(secondOriginal, 'second.md').summary.sourceFingerprint
+
+    await expect(applyKnowledgeEdits({
+      root,
+      input: { edits: [
+        { problemId: 'first.md', sourceFingerprint: firstFingerprint, classification: { scene: 'Scene', capabilities: ['One'], knowledge: ['Knowledge'] } },
+        { problemId: 'second.md', sourceFingerprint: secondFingerprint, classification: { scene: 'Scene', capabilities: ['Two'], knowledge: ['Knowledge'] } }
+      ] },
+      dependencies: {
+        renameFile: async (from, to) => {
+          if (String(to) === secondPath && String(from).endsWith('.tmp') && !String(from).includes('.rollback.')) {
+            throw new Error('simulated rename failure')
+          }
+          await rename(from, to)
+        }
+      }
+    })).rejects.toMatchObject({ code: 'WRITE_FAILED' })
+
+    expect(await readFile(firstPath, 'utf8')).toBe(firstOriginal)
+    expect(await readFile(secondPath, 'utf8')).toBe(secondOriginal)
+    expect(await readdir(path.join(root, '.restx-backup'))).toHaveLength(2)
   })
 })

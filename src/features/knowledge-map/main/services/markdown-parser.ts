@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { parseDocument, type Document, type ParsedNode } from 'yaml'
-import type { KnowledgeLabels, KnowledgeProblemSummary } from '../../shared/contracts'
+import type { KnowledgeEditableClassification, KnowledgeLabels, KnowledgeProblemSummary } from '../../shared/contracts'
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/
 
@@ -42,6 +42,7 @@ function normalizedList(value: unknown): string[] | null {
 
 function validateLabels(document: Document.Parsed<ParsedNode>): {
   labels?: KnowledgeLabels
+  classification?: KnowledgeEditableClassification
   status: KnowledgeProblemSummary['status']
   issue?: string
 } {
@@ -64,8 +65,15 @@ function validateLabels(document: Document.Parsed<ParsedNode>): {
     || (capabilityValue !== undefined && capabilities === null)
     || (knowledgeValue !== undefined && knowledge === null)
   if (hasInvalidType) return { status: 'invalid', issue: 'Frontmatter 的场景、能力或知识字段类型无效。' }
-  if (!scene || !capabilities?.length || !knowledge?.length || type !== 'problem') return { status: 'pending' }
-  return { status: 'organized', labels: { scene, capabilities, knowledge } }
+  const classification: KnowledgeEditableClassification = {
+    scene,
+    capabilities: capabilities ?? [],
+    knowledge: knowledge ?? []
+  }
+  if (!scene || !capabilities?.length || !knowledge?.length || type !== 'problem') {
+    return { status: 'pending', classification }
+  }
+  return { status: 'organized', classification, labels: { scene, capabilities, knowledge } }
 }
 
 export function parseKnowledgeMarkdown(
@@ -110,6 +118,7 @@ export function parseKnowledgeMarkdown(
       ...common,
       status: validation.status,
       ...(validation.labels ? { labels: validation.labels } : {}),
+      ...(validation.classification ? { classification: validation.classification } : {}),
       ...(validation.issue ? { issue: validation.issue } : {})
     }
   }

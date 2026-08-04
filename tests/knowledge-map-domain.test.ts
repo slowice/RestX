@@ -3,6 +3,14 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
 import { buildKnowledgeGraph } from '../src/features/knowledge-map/shared/knowledge-catalog'
+import {
+  buildDraftProblems,
+  buildKnowledgeDraftGraph,
+  buildKnowledgeEdits,
+  createKnowledgeDraft,
+  removeKnowledgeLabel,
+  updateKnowledgeDraft
+} from '../src/features/knowledge-map/shared/knowledge-draft'
 import { parseKnowledgeMarkdown } from '../src/features/knowledge-map/main/services/markdown-parser'
 import { scanKnowledgeRoot } from '../src/features/knowledge-map/main/services/knowledge-scanner'
 
@@ -68,6 +76,26 @@ scene: [broken
     expect(parsed.body).toContain('# Broken metadata')
   })
 
+  test('keeps valid partial labels editable while a problem is pending', () => {
+    const parsed = parseKnowledgeMarkdown(`---
+type: problem
+capability: [Filesystem]
+knowledge: [YAML]
+---
+# Partial
+`, 'partial.md')
+
+    expect(parsed.summary).toMatchObject({
+      status: 'pending',
+      classification: {
+        scene: null,
+        capabilities: ['Filesystem'],
+        knowledge: ['YAML']
+      }
+    })
+    expect(createKnowledgeDraft([parsed.summary])['partial.md'].current).toEqual(parsed.summary.classification)
+  })
+
   test('aggregates canonical labels into one layered graph node', () => {
     const first = parseKnowledgeMarkdown(`---
 type: problem
@@ -94,6 +122,62 @@ knowledge: [IPC]
     expect(graph.knowledge).toHaveLength(1)
     expect(graph.problems).toHaveLength(2)
     expect(graph.edges.filter((edge) => edge.kind === 'scene-capability')).toHaveLength(1)
+  })
+
+  test('builds a live graph from normalized problem draft edits without orphan labels', () => {
+    const pending = parseKnowledgeMarkdown('# Pending', 'pending.md').summary
+    const draft = updateKnowledgeDraft(createKnowledgeDraft([pending]), pending.id, {
+      scene: '  Knowledge Manager ',
+      capabilities: ['Electron', ' electron '],
+      knowledge: ['IPC']
+    })
+
+    const graph = buildKnowledgeDraftGraph([pending], draft)
+    const edits = buildKnowledgeEdits(draft)
+
+    expect(graph.scenes.map((node) => node.label)).toEqual(['Knowledge Manager'])
+    expect(graph.capabilities.map((node) => node.label)).toEqual(['Electron'])
+    expect(graph.problems.find((problem) => problem.problemId === pending.id)?.status).toBe('organized')
+    expect(edits.edits).toEqual([expect.objectContaining({
+      problemId: 'pending.md',
+      classification: {
+        scene: 'Knowledge Manager',
+        capabilities: ['Electron'],
+        knowledge: ['IPC']
+      }
+    })])
+  })
+
+  test('removes a global label from every draft and moves incomplete problems to pending', () => {
+    const first = parseKnowledgeMarkdown(`---
+type: problem
+scene: Shared
+capability: [Electron]
+knowledge: [IPC]
+---
+# One
+`, 'one.md').summary
+    const second = parseKnowledgeMarkdown(`---
+type: problem
+scene: Shared
+capability: [Filesystem, Electron]
+knowledge: [YAML]
+---
+# Two
+`, 'two.md').summary
+    const initial = createKnowledgeDraft([first, second])
+    const withoutScene = removeKnowledgeLabel(initial, 'scene', ' shared ')
+    const problems = buildDraftProblems([first, second], withoutScene)
+
+    expect(problems.every((problem) => problem.status === 'pending')).toBe(true)
+    expect(buildKnowledgeDraftGraph([first, second], withoutScene).scenes).toHaveLength(0)
+    expect(buildKnowledgeEdits(withoutScene).edits).toHaveLength(2)
+
+    const semanticallyRemoved = updateKnowledgeDraft(initial, first.id, null)
+    expect(buildKnowledgeEdits(semanticallyRemoved).edits[0]).toMatchObject({
+      problemId: 'one.md',
+      classification: null
+    })
   })
 
   test('recursively scans regular Markdown while excluding hidden, backup, and symlink trees', async () => {

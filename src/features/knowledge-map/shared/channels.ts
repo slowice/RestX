@@ -3,7 +3,7 @@ export const knowledgeMapChannels = {
   read: 'feature:knowledge-map:read',
   classify: 'feature:knowledge-map:classify',
   apply: 'feature:knowledge-map:apply',
+  saveEdits: 'feature:knowledge-map:save-edits',
   open: 'feature:knowledge-map:open',
   openRoot: 'feature:knowledge-map:open-root'
 } as const
-

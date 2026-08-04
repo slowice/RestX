@@ -6,6 +6,12 @@ export type KnowledgeLabels = {
   knowledge: string[]
 }
 
+export type KnowledgeEditableClassification = {
+  scene: string | null
+  capabilities: string[]
+  knowledge: string[]
+}
+
 export type KnowledgeProblemSummary = {
   id: string
   name: string
@@ -15,6 +21,7 @@ export type KnowledgeProblemSummary = {
   modifiedAt: string
   sourceFingerprint: string
   labels?: KnowledgeLabels
+  classification?: KnowledgeEditableClassification
   issue?: string
 }
 
@@ -93,3 +100,14 @@ export type ApplyKnowledgeClassificationInput = {
   knowledge: string[]
 }
 
+export type KnowledgeProblemEdit = {
+  problemId: string
+  sourceFingerprint: string
+  classification: KnowledgeEditableClassification | null
+}
+
+export type ApplyKnowledgeEditsInput = {
+  edits: KnowledgeProblemEdit[]
+}
+
+export const MAX_KNOWLEDGE_EDIT_BATCH = 100

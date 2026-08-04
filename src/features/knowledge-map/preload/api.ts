@@ -13,10 +13,10 @@ export const knowledgeMapPreloadFeature = definePreloadFeature({
         read: (problemId) => invoke(channels.read, problemId),
         classify: (problemId) => invoke(channels.classify, problemId),
         apply: (input) => invoke(channels.apply, input),
+        saveEdits: (input) => invoke(channels.saveEdits, input),
         open: (problemId) => invoke(channels.open, problemId),
         openRoot: () => invoke(channels.openRoot)
       }
     }
   }
 })
-

@@ -1,5 +1,6 @@
 import type {
   ApplyKnowledgeClassificationInput,
+  ApplyKnowledgeEditsInput,
   KnowledgeClassificationSuggestion,
   KnowledgeProblemDetail,
   KnowledgeScanResult
@@ -11,8 +12,8 @@ export type KnowledgeMapApi = {
     read(problemId: string): Promise<KnowledgeProblemDetail>
     classify(problemId: string): Promise<KnowledgeClassificationSuggestion>
     apply(input: ApplyKnowledgeClassificationInput): Promise<KnowledgeScanResult>
+    saveEdits(input: ApplyKnowledgeEditsInput): Promise<KnowledgeScanResult>
     open(problemId: string): Promise<void>
     openRoot(): Promise<void>
   }
 }
-

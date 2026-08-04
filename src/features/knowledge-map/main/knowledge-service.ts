@@ -2,6 +2,7 @@ import { mkdir } from 'node:fs/promises'
 import type { AiProviderExecutionContext } from '../../../platform/ai-provider/shared/contracts'
 import type {
   ApplyKnowledgeClassificationInput,
+  ApplyKnowledgeEditsInput,
   KnowledgeClassificationSuggestion,
   KnowledgeProblemDetail,
   KnowledgeScanResult
@@ -13,7 +14,7 @@ import {
   readSafeKnowledgeFile
 } from './services/knowledge-file-access'
 import { parseKnowledgeMarkdown, type ParsedKnowledgeMarkdown } from './services/markdown-parser'
-import { applyKnowledgeClassification } from './services/markdown-writer'
+import { applyKnowledgeClassification, applyKnowledgeEdits } from './services/markdown-writer'
 import { scanKnowledgeRoot } from './services/knowledge-scanner'
 
 type ExecuteActive = <T>(operation: (context: AiProviderExecutionContext) => Promise<T>) => Promise<T>
@@ -86,6 +87,16 @@ export class KnowledgeService {
   async apply(input: ApplyKnowledgeClassificationInput): Promise<KnowledgeScanResult> {
     await this.currentProblem(input.problemId)
     await applyKnowledgeClassification({
+      root: this.dependencies.root,
+      input,
+      now: this.dependencies.now
+    })
+    return this.scan()
+  }
+
+  async saveEdits(input: ApplyKnowledgeEditsInput): Promise<KnowledgeScanResult> {
+    for (const edit of input.edits) await this.currentProblem(edit.problemId)
+    await applyKnowledgeEdits({
       root: this.dependencies.root,
       input,
       now: this.dependencies.now

@@ -9,7 +9,10 @@ type GraphNode = KnowledgeVirtualNode | KnowledgeProblemNode
 type Props = {
   graph: KnowledgeGraph
   selectedProblemId: string | null
+  selectedLabelId?: string | null
+  editing?: boolean
   onSelectProblem(problemId: string): void
+  onSelectLabel?(node: KnowledgeVirtualNode): void
 }
 
 const columnX = {
@@ -26,7 +29,14 @@ function positionsFor(nodes: GraphNode[], kind: GraphNode['kind']): Map<string, 
   ]))
 }
 
-export function LayeredKnowledgeGraph({ graph, selectedProblemId, onSelectProblem }: Props): React.JSX.Element {
+export function LayeredKnowledgeGraph({
+  graph,
+  selectedProblemId,
+  selectedLabelId = null,
+  editing = false,
+  onSelectProblem,
+  onSelectLabel
+}: Props): React.JSX.Element {
   const organizedProblems = graph.problems.filter((problem) => problem.status === 'organized')
   const columns: Array<{ kind: GraphNode['kind']; label: string; nodes: GraphNode[] }> = [
     { kind: 'scene', label: '场景', nodes: graph.scenes },
@@ -71,7 +81,7 @@ export function LayeredKnowledgeGraph({ graph, selectedProblemId, onSelectProble
         </svg>
         {columns.flatMap((column) => column.nodes.map((node) => {
           const point = position.get(node.id)!
-          const className = `knowledge-node ${node.kind}${node.kind === 'problem' && node.problemId === selectedProblemId ? ' selected' : ''}`
+          const className = `knowledge-node ${node.kind}${node.kind === 'problem' && node.problemId === selectedProblemId ? ' selected' : ''}${node.kind !== 'problem' && node.id === selectedLabelId ? ' selected' : ''}`
           if (node.kind === 'problem') {
             return (
               <button
@@ -85,10 +95,20 @@ export function LayeredKnowledgeGraph({ graph, selectedProblemId, onSelectProble
               </button>
             )
           }
-          return (
-            <div key={node.id} className={className} style={{ left: point.x - 82, top: point.y - 28 }}>
-              <strong>{node.label}</strong><span>{node.problemCount} 个问题</span>
-            </div>
+          const content = <><strong>{node.label}</strong><span>{node.problemCount} 个问题</span></>
+          return editing ? (
+            <button
+              key={node.id}
+              type="button"
+              className={className}
+              style={{ left: point.x - 82, top: point.y - 28 }}
+              aria-label={`编辑${node.kind === 'scene' ? '场景' : node.kind === 'capability' ? '能力' : '知识'}标签 ${node.label}`}
+              onClick={() => onSelectLabel?.(node)}
+            >
+              {content}
+            </button>
+          ) : (
+            <div key={node.id} className={className} style={{ left: point.x - 82, top: point.y - 28 }}>{content}</div>
           )
         }))}
       </div>

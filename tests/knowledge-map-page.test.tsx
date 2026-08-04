@@ -6,6 +6,7 @@ import type { RestXApi } from '../src/app-api'
 import { buildKnowledgeGraph, buildKnowledgeLabelCatalog } from '../src/features/knowledge-map/shared/knowledge-catalog'
 import { KnowledgeMapPage } from '../src/features/knowledge-map/renderer/KnowledgeMapPage'
 import type {
+  ApplyKnowledgeEditsInput,
   KnowledgeClassificationSuggestion,
   KnowledgeProblemSummary,
   KnowledgeScanResult
@@ -76,6 +77,29 @@ function installApi() {
       result = scanResult([updated, organized])
       return result
     }),
+    saveEdits: vi.fn(async (input: ApplyKnowledgeEditsInput) => {
+      const edits = new Map(input.edits.map((edit) => [edit.problemId, edit]))
+      result = scanResult(result.problems.map((problem) => {
+        const edit = edits.get(problem.id)
+        if (!edit) return problem
+        const classification = edit.classification
+        if (!classification?.scene || !classification.capabilities.length || !classification.knowledge.length) {
+          const next = { ...problem, status: 'pending' as const }
+          delete next.labels
+          return next
+        }
+        return {
+          ...problem,
+          status: 'organized' as const,
+          labels: {
+            scene: classification.scene,
+            capabilities: classification.capabilities,
+            knowledge: classification.knowledge
+          }
+        }
+      }))
+      return result
+    }),
     open: vi.fn(async () => undefined),
     openRoot: vi.fn(async () => undefined)
   } satisfies RestXApi['knowledge']
@@ -134,6 +158,71 @@ describe('KnowledgeMapPage', () => {
     })))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.queryByRole('button', { name: /待整理.*标签应该存在哪里/ })).not.toBeInTheDocument()
+  })
+
+  test('edits a pending problem in one draft and saves its new relationships', async () => {
+    const api = installApi()
+    render(<KnowledgeMapPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '编辑' }))
+    fireEvent.click(screen.getByRole('button', { name: /待整理.*标签应该存在哪里/ }))
+    fireEvent.change(screen.getByLabelText('场景标签'), { target: { value: '知识管理器' } })
+    fireEvent.change(screen.getByLabelText('新增能力'), { target: { value: '知识建模' } })
+    fireEvent.click(screen.getByRole('button', { name: '添加能力' }))
+    fireEvent.change(screen.getByLabelText('新增知识'), { target: { value: 'YAML Frontmatter' } })
+    fireEvent.click(screen.getByRole('button', { name: '添加知识' }))
+
+    expect(screen.getByText('分类完整，保存后进入已整理路径。')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '保存（1）' }))
+
+    await waitFor(() => expect(api.saveEdits).toHaveBeenCalledWith({ edits: [expect.objectContaining({
+      problemId: 'pending.md',
+      classification: {
+        scene: '知识管理器',
+        capabilities: ['知识建模'],
+        knowledge: ['YAML Frontmatter']
+      }
+    })] }))
+    expect(await screen.findByText('已保存 1 个问题的关系修改。')).toBeInTheDocument()
+  })
+
+  test('cancels the complete editing draft without writing', async () => {
+    const api = installApi()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    render(<KnowledgeMapPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '编辑' }))
+    fireEvent.click(screen.getByRole('button', { name: /待整理.*标签应该存在哪里/ }))
+    fireEvent.change(screen.getByLabelText('场景标签'), { target: { value: '临时场景' } })
+    fireEvent.click(screen.getByRole('button', { name: '取消' }))
+
+    expect(window.confirm).toHaveBeenCalledWith('确定放弃本次全部知识图谱修改吗？')
+    expect(api.saveEdits).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: '编辑' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /待整理.*标签应该存在哪里/ })).toBeInTheDocument()
+  })
+
+  test('globally deletes a label and retains the draft when saving fails', async () => {
+    const api = installApi()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    api.saveEdits.mockRejectedValueOnce(new Error('部分问题文件已发生变化，请刷新后重新编辑。'))
+    render(<KnowledgeMapPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '编辑' }))
+    fireEvent.click(screen.getByRole('button', { name: '编辑场景标签 知识管理器' }))
+    expect(screen.getByText('1', { selector: '.knowledge-label-impact strong' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '删除此标签' }))
+
+    expect(window.confirm).toHaveBeenCalledWith('删除标签“知识管理器”会影响 1 个问题，确定继续吗？')
+    expect(screen.getByRole('button', { name: /待整理.*如何安全读取本地 MD/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '保存（1）' }))
+
+    expect(await screen.findByText('部分问题文件已发生变化，请刷新后重新编辑。')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '保存（1）' })).toBeInTheDocument()
+    expect(api.saveEdits).toHaveBeenCalledWith({ edits: [expect.objectContaining({
+      problemId: 'organized.md',
+      classification: expect.objectContaining({ scene: null })
+    })] })
   })
 
   test('shows an empty knowledge directory action', async () => {
