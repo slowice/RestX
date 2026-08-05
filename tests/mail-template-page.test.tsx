@@ -48,6 +48,7 @@ describe('mail template reuse page', () => {
       cc: ['team@example.com'],
       subject: '【RestX】本周周报'
     })))
+    expect(await screen.findByText('已在经典 Outlook 中打开草稿，请检查后再发送。')).toBeInTheDocument()
   })
 
   it('blocks handoff for malformed JSON and unresolved variables', () => {

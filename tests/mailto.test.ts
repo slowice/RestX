@@ -5,14 +5,15 @@ describe('mail template mailto boundary', () => {
   it('builds a bounded mailto URI from a structured valid draft', () => {
     const uri = buildMailtoUri({
       to: ['one@example.com', 'two@example.com'],
-      cc: ['team@example.com'],
-      bcc: [],
+      cc: ['team@example.com', 'owner@example.com'],
+      bcc: ['audit@example.com', 'archive@example.com'],
       subject: '项目 周报',
       body: '第一行\n第二行'
     })
     expect(uri).toMatch(/^mailto:/)
-    expect(uri).toContain('one%40example.com,two%40example.com')
-    expect(uri).toContain('cc=team%40example.com')
+    expect(uri).toContain('one%40example.com;two%40example.com')
+    expect(uri).toContain('cc=team%40example.com%3Bowner%40example.com')
+    expect(uri).toContain('bcc=audit%40example.com%3Barchive%40example.com')
     expect(uri).toContain('subject=%E9%A1%B9%E7%9B%AE%20%E5%91%A8%E6%8A%A5')
     expect(uri).toContain('body=%E7%AC%AC%E4%B8%80%E8%A1%8C%0A%E7%AC%AC%E4%BA%8C%E8%A1%8C')
   })

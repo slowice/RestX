@@ -4,8 +4,8 @@ import { readMailDraft } from '../shared/template-engine'
 export function buildMailtoUri(input: unknown): string {
   const draft = readMailDraft(input)
   const query: string[] = []
-  appendQuery(query, 'cc', draft.cc.join(','))
-  appendQuery(query, 'bcc', draft.bcc.join(','))
+  appendQuery(query, 'cc', draft.cc.join(';'))
+  appendQuery(query, 'bcc', draft.bcc.join(';'))
   appendQuery(query, 'subject', draft.subject)
   appendQuery(query, 'body', draft.body)
   const uri = `mailto:${encodeRecipients(draft.to)}?${query.join('&')}`
@@ -18,5 +18,5 @@ function appendQuery(query: string[], name: keyof Pick<MailDraft, 'cc' | 'bcc' |
 }
 
 function encodeRecipients(recipients: string[]): string {
-  return recipients.map((recipient) => encodeURIComponent(recipient)).join(',')
+  return recipients.map((recipient) => encodeURIComponent(recipient)).join(';')
 }

@@ -155,7 +155,7 @@ export function MailTemplatePage(): React.JSX.Element {
     setNotice(null)
     try {
       await window.restx.mailTemplates.openDraft(rendered.draft)
-      setNotice({ kind: 'success', text: '已交给 Outlook 或系统默认邮件软件，请检查后再发送。' })
+      setNotice({ kind: 'success', text: '已在经典 Outlook 中打开草稿，请检查后再发送。' })
     } catch (reason) {
       setNotice({ kind: 'error', text: errorMessage(reason) })
     } finally {

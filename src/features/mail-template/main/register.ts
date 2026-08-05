@@ -1,7 +1,8 @@
-import { dialog, shell } from 'electron'
+import { dialog } from 'electron'
 import { readFile, stat } from 'node:fs/promises'
 import { defineMainFeature } from '../../../platform/main/define-feature'
 import { mailTemplateChannels } from '../shared/channels'
+import { openWithClassicOutlook } from './classic-outlook'
 import { buildMailtoUri } from './mailto'
 import { importOutlookMessage } from './message-import'
 
@@ -11,7 +12,7 @@ export const mailTemplateMainFeature = defineMainFeature({
   channels: Object.values(mailTemplateChannels),
   register({ ipc }) {
     ipc.handle(mailTemplateChannels.openDraft, async (_event, draft: unknown) => {
-      await shell.openExternal(buildMailtoUri(draft))
+      await openWithClassicOutlook(buildMailtoUri(draft))
     })
     ipc.handle(mailTemplateChannels.importMessage, () => importOutlookMessage({
       selectFile: async () => {
