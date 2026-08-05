@@ -74,7 +74,7 @@ async function requestDraft({ settings, userPayload, fetchImpl = fetch, logger =
   const baseUrl = normalizeBaseUrl(settings.baseUrl)
   if (!settings.model.trim() || !settings.apiKey) throw new ProviderError('AI 服务配置不完整。', 'INVALID_SETTINGS')
   const requestPayload = {
-    model: settings.model.trim(), temperature: 0.1, max_tokens: 6_000,
+    model: settings.model.trim(), stream: false, temperature: 0.1, max_tokens: 6_000,
     messages: [{ role: 'system', content: SMART_PRESET_SYSTEM_PROMPT }, { role: 'user', content: userPayload }]
   }
   const endpoint = `${baseUrl}/chat/completions`

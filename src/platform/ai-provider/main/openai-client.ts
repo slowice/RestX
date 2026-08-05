@@ -126,6 +126,7 @@ export async function testOpenAiProvider(
       headers: createOpenAiRequestHeaders(provider),
       body: JSON.stringify({
         model: provider.modelId,
+        stream: false,
         temperature: 0,
         max_tokens: 8,
         messages: [{ role: 'user', content: 'Reply with OK.' }]

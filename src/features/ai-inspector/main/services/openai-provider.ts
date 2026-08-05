@@ -253,6 +253,7 @@ export async function analyzeWithOpenAiCompatible({
 
   const requestPayload = {
     model: settings.model.trim(),
+    stream: false,
     temperature: 0.1,
     max_tokens: 4_000,
     messages: [

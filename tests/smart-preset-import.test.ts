@@ -43,6 +43,7 @@ describe('smart preset generation', () => {
     expect(result.trial.detected).toBe(true)
     expect(result.trial.candidates.map((item) => item.name)).toEqual(['config.json', 'run.log'])
     const requestBody = JSON.parse(String((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body))
+    expect(requestBody.stream).toBe(false)
     expect(requestBody.messages[0].content).toBe(SMART_PRESET_SYSTEM_PROMPT)
     expect(JSON.stringify(requestBody)).not.toContain('SECRET_FILE_BODY')
     expect(JSON.stringify(requestBody)).not.toContain('top-secret')

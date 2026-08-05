@@ -57,6 +57,7 @@ describe('analyzeWithOpenAiCompatible', () => {
     expect(new Headers(request.headers).get('authorization')).toBe('Bearer top-secret')
     const body = JSON.parse(String(request.body))
     expect(body.model).toBe('demo-model')
+    expect(body.stream).toBe(false)
     expect(JSON.stringify(body)).not.toContain('top-secret')
     expect(JSON.stringify(body)).not.toContain('/authorized/config.json')
     expect(JSON.stringify(body)).toContain('[REDACTED]')

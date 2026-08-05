@@ -36,6 +36,7 @@ describe('AI Provider 连接测试日志', () => {
     expect(headers.get('authorization')).toBe('Gateway token')
     expect(headers.get('content-type')).toBe('application/custom+json')
     expect(headers.get('x-gateway')).toBe('restx')
+    expect(JSON.parse(String(request?.body)).stream).toBe(false)
   })
 
   it('网络失败时记录错误类别，且不记录凭据或代理地址', async () => {
