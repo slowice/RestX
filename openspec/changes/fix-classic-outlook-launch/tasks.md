@@ -16,4 +16,4 @@
 - [x] 3.2 Update mailto, IPC-boundary, and renderer tests for semicolon-separated recipients and classic Outlook messaging.
 - [x] 3.3 Run the focused mail-template tests, applicable TypeScript checks, `git diff --check`, and strict OpenSpec validation; fix only affected failures.
 - [x] 3.4 Start real Electron on macOS and verify the unsupported-platform error and redacted log without invoking another mail client.
-- [ ] 3.5 Verify on the Windows execution machine that classic Outlook—not new Outlook—opens the draft with correct To, CC, BCC, subject, and body, and that missing Outlook produces an error plus a redacted log.
+- [x] 3.5 Verify on the Windows execution machine that classic Outlook—not new Outlook—opens the draft with correct To, CC, BCC, subject, and body, and that missing Outlook produces an error plus a redacted log.
