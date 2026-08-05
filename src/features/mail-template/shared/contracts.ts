@@ -9,7 +9,8 @@ export type MailTemplate = {
   cc: string
   bcc: string
   subject: string
-  body: string
+  bodyHtml: string
+  bodyText: string
   defaults: JsonObject
   updatedAt: string
 }
@@ -19,7 +20,8 @@ export type MailDraft = {
   cc: string[]
   bcc: string[]
   subject: string
-  body: string
+  bodyHtml: string
+  bodyText: string
 }
 
 export type ImportedMailMessage = {
@@ -35,7 +37,7 @@ export type ImportedMailMessage = {
 }
 
 export type MailValidationIssue = {
-  code: 'missing-recipient' | 'invalid-recipient' | 'missing-variable' | 'empty-subject' | 'empty-body' | 'field-too-long'
+  code: 'missing-recipient' | 'invalid-recipient' | 'missing-variable' | 'empty-subject' | 'empty-body' | 'field-too-long' | 'unsafe-html' | 'body-text-mismatch'
   field: 'to' | 'cc' | 'bcc' | 'subject' | 'body' | 'template'
   message: string
   value?: string
@@ -60,6 +62,11 @@ export const MAIL_TEMPLATE_LIMITS = {
   recipientCount: 100,
   subject: 998,
   body: 12_000,
+  bodyHtml: 240_000,
+  clipboardHtml: 500_000,
+  tableRows: 500,
+  tableColumns: 100,
+  tableCells: 10_000,
   mailtoUri: 24_000,
   importFileBytes: 25 * 1024 * 1024,
   sourceName: 255

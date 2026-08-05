@@ -44,6 +44,29 @@
 .mail-field textarea.invalid { border-color: #df9398; background: #fffafa; }
 .compact-field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .body-editor { min-height: 145px; }
+.rich-mail-editor { overflow: hidden; border: 1px solid #dcdcdc; border-radius: 8px; background: #fff; }
+.rich-mail-editor:focus-within { border-color: #76cbb5; box-shadow: 0 0 0 3px rgba(16, 163, 127, .08); }
+.rich-mail-editor.loading { min-height: 145px; padding: 12px; color: #888; font-size: 9px; }
+.rich-editor-toolbar { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; border-bottom: 1px solid #e6e6e6; background: #fafafa; }
+.rich-editor-toolbar button, .color-tool { display: inline-flex; min-height: 24px; align-items: center; justify-content: center; padding: 3px 6px; color: #555; border: 1px solid #ddd; border-radius: 5px; background: #fff; font-size: 8px; cursor: pointer; }
+.rich-editor-toolbar button:hover:not(:disabled), .rich-editor-toolbar button.active { color: #087d62; border-color: #9bdac9; background: #effaf6; }
+.rich-editor-toolbar button:disabled, .color-tool.disabled { opacity: .42; cursor: not-allowed; }
+.toolbar-separator { width: 1px; margin: 2px; background: #ddd; }
+.color-tool { gap: 4px; }
+.color-tool span { white-space: nowrap; }
+.color-tool input { width: 15px; height: 15px; padding: 0; overflow: hidden; border: 0; border-radius: 3px; cursor: pointer; }
+.rich-mail-content { min-height: 175px; max-height: 360px; padding: 10px; overflow: auto; color: #202020; outline: none; font: 10px/1.55 Inter, system-ui, sans-serif; }
+.rich-mail-content > :first-child, .rich-preview > :first-child { margin-top: 0; }
+.rich-mail-content > :last-child, .rich-preview > :last-child { margin-bottom: 0; }
+.rich-mail-content p, .rich-preview p { margin: 0 0 7px; }
+.rich-mail-content .tableWrapper, .rich-preview { overflow-x: auto; }
+.rich-mail-content table, .rich-preview table { width: auto; max-width: 100%; border-collapse: collapse; table-layout: fixed; }
+.rich-mail-content td, .rich-mail-content th, .rich-preview td, .rich-preview th { min-width: 50px; padding: 4px; border: 1px solid #b8b8b8; vertical-align: middle; }
+.rich-mail-content th, .rich-preview th { background: #f4f4f4; font-weight: 700; }
+.rich-mail-content .selectedCell::after { position: absolute; inset: 0; z-index: 2; content: ''; pointer-events: none; background: rgba(16, 163, 127, .14); }
+.rich-mail-content td, .rich-mail-content th { position: relative; }
+.rich-mail-content .column-resize-handle { position: absolute; top: 0; right: -2px; bottom: -2px; z-index: 5; width: 4px; pointer-events: none; background: #10a37f; }
+.rich-mail-content.resize-cursor { cursor: col-resize; }
 .json-editor { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 9px !important; tab-size: 2; }
 .per-send-editor { min-height: 135px; background: #fbfbfb !important; }
 .editor-actions { display: flex; gap: 7px; padding: 11px 13px; border-top: 1px solid #e8e8e8; background: #fafafa; }
@@ -64,7 +87,8 @@
 .preview-recipients em { padding: 2px 5px; color: #4c4c4c; border-radius: 4px; background: #f1f1f1; font-size: 8px; font-style: normal; }
 .preview-recipients i { color: #aaa; font-size: 8px; font-style: normal; }
 .preview-subject strong { overflow-wrap: anywhere; color: #242424; font-size: 10px; }
-.preview-body { min-height: 185px; max-height: 280px; margin: 0; padding: 13px; overflow: auto; color: #353535; background: #fff; font: 10px/1.7 Inter, system-ui, sans-serif; white-space: pre-wrap; overflow-wrap: anywhere; }
+.preview-body { min-height: 185px; max-height: 320px; margin: 0; padding: 13px; overflow: auto; color: #353535; background: #fff; font: 10px/1.7 Inter, system-ui, sans-serif; overflow-wrap: anywhere; }
+.empty-preview { white-space: pre-wrap; }
 .preview-card mark { padding: 1px 2px; color: #9a5200; border-radius: 3px; background: #fff0c9; }
 .issue-list { margin-top: 10px; padding: 10px 11px; color: #8a4b00; border: 1px solid #efdaac; border-radius: 9px; background: #fffaf0; }
 .issue-list > div { display: flex; align-items: center; gap: 6px; }
@@ -74,6 +98,7 @@
 .handoff-actions > div { display: flex; flex-direction: column; gap: 3px; }
 .handoff-actions strong { color: #333; font-size: 9px; }
 .handoff-actions span { color: #888; font-size: 8px; }
+.handoff-buttons { display: flex; align-items: center; gap: 7px; }
 
 @media (max-width: 1180px) {
   .mail-template-workspace { grid-template-columns: 190px minmax(310px, .9fr) minmax(340px, 1.1fr); }

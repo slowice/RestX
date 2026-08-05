@@ -38,7 +38,8 @@ describe('preload API composition', () => {
     await api.codeReview.listMyGitCodeMergeRequests()
     await api.codeReview.getGitCodeSettings()
     await api.codeReview.getCodeHubSettings()
-    await api.mailTemplates.openDraft({ to: ['user@example.com'], cc: [], bcc: [], subject: '主题', body: '正文' })
+    const richDraft = { to: ['user@example.com'], cc: [], bcc: [], subject: '主题', bodyHtml: '<p>正文</p>', bodyText: '正文' }
+    await api.mailTemplates.openDraft(richDraft)
     await api.mailTemplates.importMessage()
     await api.frequentSkills.execute('skill-1')
 
@@ -49,7 +50,7 @@ describe('preload API composition', () => {
     expect(calls).toHaveBeenNthCalledWith(5, codeReviewChannels.listMyGitCodeMergeRequests)
     expect(calls).toHaveBeenNthCalledWith(6, codeReviewChannels.getGitCodeSettings)
     expect(calls).toHaveBeenNthCalledWith(7, codeReviewChannels.getCodeHubSettings)
-    expect(calls).toHaveBeenNthCalledWith(8, mailTemplateChannels.openDraft, { to: ['user@example.com'], cc: [], bcc: [], subject: '主题', body: '正文' })
+    expect(calls).toHaveBeenNthCalledWith(8, mailTemplateChannels.openDraft, richDraft)
     expect(calls).toHaveBeenNthCalledWith(9, mailTemplateChannels.importMessage)
     expect(calls).toHaveBeenNthCalledWith(10, frequentSkillsChannels.execute, 'skill-1')
   })

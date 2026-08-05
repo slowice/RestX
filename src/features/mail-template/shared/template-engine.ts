@@ -7,6 +7,7 @@ import {
   type MailValidationIssue,
   type RenderedMailTemplate
 } from './contracts'
+import { escapeHtml, mailHtmlToText, mapMailHtmlText, sanitizeMailHtml } from './rich-body'
 
 const PLACEHOLDER_PATTERN = /\{\{\s*([A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_-]*)*)\s*\}\}/g
 const EMAIL_PATTERN = /^[^\s<>@,;]+@[^\s<>@,;]+\.[^\s<>@,;]+$/
@@ -74,22 +75,36 @@ export function renderMailTemplate(template: MailTemplate, perSendData: JsonObje
     to: renderTemplateText(template.to, data),
     cc: renderTemplateText(template.cc, data),
     bcc: renderTemplateText(template.bcc, data),
-    subject: renderTemplateText(template.subject, data),
-    body: renderTemplateText(template.body, data)
+    subject: renderTemplateText(template.subject, data)
   }
-  const missingVariables = [...new Set(Object.values(fields).flatMap((field) => field.missing))].sort()
+  const richBody = renderRichBody(template.bodyHtml, data)
+  const missingVariables = [...new Set([...Object.values(fields).flatMap((field) => field.missing), ...richBody.missing])].sort()
   const draft: MailDraft = {
     to: parseRecipientList(fields.to.value),
     cc: parseRecipientList(fields.cc.value),
     bcc: parseRecipientList(fields.bcc.value),
     subject: fields.subject.value,
-    body: fields.body.value
+    bodyHtml: richBody.html,
+    bodyText: mailHtmlToText(richBody.html)
   }
   const issues = validateMailDraft(draft)
   for (const variable of missingVariables) {
     issues.unshift({ code: 'missing-variable', field: 'template', value: variable, message: `变量 {{${variable}}} 还没有值。` })
   }
   return { draft, missingVariables, issues }
+}
+
+export function renderRichBody(source: string, data: JsonObject): { html: string; missing: string[] } {
+  const missing = new Set<string>()
+  const html = mapMailHtmlText(source, (text) => text.replace(PLACEHOLDER_PATTERN, (token, path: string) => {
+    const resolved = readPath(data, path)
+    if (resolved === undefined || resolved === null) {
+      missing.add(path)
+      return token
+    }
+    return escapeHtml(typeof resolved === 'object' ? JSON.stringify(resolved) : String(resolved))
+  }))
+  return { html, missing: [...missing] }
 }
 
 export function validateMailDraft(draft: MailDraft): MailValidationIssue[] {
@@ -108,9 +123,12 @@ export function validateMailDraft(draft: MailDraft): MailValidationIssue[] {
   }
 
   if (!draft.subject.trim()) issues.push({ code: 'empty-subject', field: 'subject', message: '邮件标题不能为空。' })
-  if (!draft.body.trim()) issues.push({ code: 'empty-body', field: 'body', message: '邮件正文不能为空。' })
+  const sanitized = sanitizeMailHtml(draft.bodyHtml)
+  if (sanitized.changed) issues.push({ code: 'unsafe-html', field: 'body', message: '邮件正文包含不受支持或不安全的格式。' })
+  if (mailHtmlToText(sanitized.html) !== draft.bodyText) issues.push({ code: 'body-text-mismatch', field: 'body', message: '邮件正文的纯文本内容与富文本不一致。' })
+  if (!draft.bodyText.trim()) issues.push({ code: 'empty-body', field: 'body', message: '邮件正文不能为空。' })
   if (draft.subject.length > MAIL_TEMPLATE_LIMITS.subject) issues.push({ code: 'field-too-long', field: 'subject', message: `邮件标题不能超过 ${MAIL_TEMPLATE_LIMITS.subject} 个字符。` })
-  if (draft.body.length > MAIL_TEMPLATE_LIMITS.body) issues.push({ code: 'field-too-long', field: 'body', message: `邮件正文不能超过 ${MAIL_TEMPLATE_LIMITS.body} 个字符。` })
+  if (draft.bodyText.length > MAIL_TEMPLATE_LIMITS.body || draft.bodyHtml.length > MAIL_TEMPLATE_LIMITS.bodyHtml) issues.push({ code: 'field-too-long', field: 'body', message: '邮件正文内容过长。' })
   return issues
 }
 
@@ -120,12 +138,15 @@ export function validateMailTemplate(template: MailTemplate): string[] {
   if (template.name.length > MAIL_TEMPLATE_LIMITS.name) errors.push(`模板名称不能超过 ${MAIL_TEMPLATE_LIMITS.name} 个字符。`)
   if (!template.to.trim()) errors.push('收件人模板不能为空。')
   if (!template.subject.trim()) errors.push('标题模板不能为空。')
-  if (!template.body.trim()) errors.push('正文模板不能为空。')
+  const sanitized = sanitizeMailHtml(template.bodyHtml)
+  if (sanitized.changed) errors.push('正文模板包含不受支持或不安全的格式。')
+  if (!template.bodyText.trim()) errors.push('正文模板不能为空。')
+  if (mailHtmlToText(sanitized.html) !== template.bodyText) errors.push('正文模板的纯文本内容与富文本不一致。')
   for (const [label, value] of [['收件人', template.to], ['抄送', template.cc], ['密送', template.bcc]] as const) {
     if (value.length > MAIL_TEMPLATE_LIMITS.recipientField) errors.push(`${label}内容过长。`)
   }
   if (template.subject.length > MAIL_TEMPLATE_LIMITS.subject) errors.push(`标题模板不能超过 ${MAIL_TEMPLATE_LIMITS.subject} 个字符。`)
-  if (template.body.length > MAIL_TEMPLATE_LIMITS.body) errors.push(`正文模板不能超过 ${MAIL_TEMPLATE_LIMITS.body} 个字符。`)
+  if (template.bodyText.length > MAIL_TEMPLATE_LIMITS.body || template.bodyHtml.length > MAIL_TEMPLATE_LIMITS.bodyHtml) errors.push('正文模板内容过长。')
   return errors
 }
 
@@ -137,7 +158,8 @@ export function readMailDraft(value: unknown): MailDraft {
     cc: readStringArray(input.cc, '抄送'),
     bcc: readStringArray(input.bcc, '密送'),
     subject: readBoundedString(input.subject, '标题', MAIL_TEMPLATE_LIMITS.subject),
-    body: readBoundedString(input.body, '正文', MAIL_TEMPLATE_LIMITS.body)
+    bodyHtml: readBoundedString(input.bodyHtml, '富文本正文', MAIL_TEMPLATE_LIMITS.bodyHtml),
+    bodyText: readBoundedString(input.bodyText, '正文', MAIL_TEMPLATE_LIMITS.body)
   }
   const issues = validateMailDraft(draft)
   if (issues.length > 0) throw new Error(issues[0].message)

@@ -8,7 +8,8 @@ describe('mail template mailto boundary', () => {
       cc: ['team@example.com', 'owner@example.com'],
       bcc: ['audit@example.com', 'archive@example.com'],
       subject: '项目 周报',
-      body: '第一行\n第二行'
+      bodyHtml: '<p>第一行</p><p>第二行</p>',
+      bodyText: '第一行\n第二行'
     })
     expect(uri).toMatch(/^mailto:/)
     expect(uri).toContain('one%40example.com;two%40example.com')
@@ -20,7 +21,7 @@ describe('mail template mailto boundary', () => {
 
   it('rejects arbitrary, invalid, and oversized input', () => {
     expect(() => buildMailtoUri('https://example.com')).toThrow(/草稿参数无效/)
-    expect(() => buildMailtoUri({ to: ['bad'], cc: [], bcc: [], subject: '主题', body: '正文' })).toThrow(/无效邮箱/)
-    expect(() => buildMailtoUri({ to: ['user@example.com'], cc: [], bcc: [], subject: '主题', body: '中'.repeat(12_000) })).toThrow(/内容较长/)
+    expect(() => buildMailtoUri({ to: ['bad'], cc: [], bcc: [], subject: '主题', bodyHtml: '<p>正文</p>', bodyText: '正文' })).toThrow(/无效邮箱/)
+    expect(() => buildMailtoUri({ to: ['user@example.com'], cc: [], bcc: [], subject: '主题', bodyHtml: `<p>${'中'.repeat(12_000)}</p>`, bodyText: '中'.repeat(12_000) })).toThrow(/内容较长/)
   })
 })

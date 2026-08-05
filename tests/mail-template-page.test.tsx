@@ -16,6 +16,12 @@ function installApi() {
   return { openDraft, importMessage }
 }
 
+function pasteBody(html: string, text: string): void {
+  fireEvent.paste(screen.getByLabelText('邮件正文'), {
+    clipboardData: { getData: (type: string) => type === 'text/html' ? html : type === 'text/plain' ? text : '' }
+  })
+}
+
 beforeEach(() => {
   localStorage.clear()
   installApi()
@@ -60,7 +66,7 @@ describe('mail template reuse page', () => {
     expect(handoff).toBeDisabled()
 
     fireEvent.change(screen.getByLabelText('本次 JSON'), { target: { value: '{}' } })
-    fireEvent.change(screen.getByLabelText('邮件正文'), { target: { value: '您好，{{missingValue}}' } })
+    pasteBody('<p>您好，{{missingValue}}</p>', '您好，{{missingValue}}')
     expect(screen.getAllByText('{{missingValue}}').length).toBeGreaterThan(0)
     expect(screen.getByText('变量 {{missingValue}} 还没有值。')).toBeInTheDocument()
     expect(handoff).toBeDisabled()
@@ -74,7 +80,7 @@ describe('mail template reuse page', () => {
     fireEvent.change(screen.getByLabelText('模板名称'), { target: { value: '客户通知' } })
     fireEvent.change(screen.getByLabelText('收件人 To'), { target: { value: 'client@example.com' } })
     fireEvent.change(screen.getByLabelText('邮件标题'), { target: { value: '客户通知标题' } })
-    fireEvent.change(screen.getByLabelText('邮件正文'), { target: { value: '客户您好' } })
+    pasteBody('<p>客户您好</p>', '客户您好')
     fireEvent.change(screen.getByLabelText('默认 JSON'), { target: { value: '{}' } })
     fireEvent.click(screen.getByRole('button', { name: '保存模板' }))
 
@@ -98,11 +104,11 @@ describe('mail template reuse page', () => {
     fireEvent.click(screen.getByRole('button', { name: '导入 Outlook 邮件' }))
     await waitFor(() => expect(screen.getByLabelText('模板名称')).toHaveValue('客户月报'))
     expect(screen.getByDisplayValue('client@example.com')).toBeInTheDocument()
-    expect(screen.getByDisplayValue(/本月进度为 70%/)).toBeInTheDocument()
+    expect(screen.getByLabelText('邮件正文')).toHaveTextContent(/本月进度为 70%/)
     expect(screen.getByText('已导入 EML')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /客户月报.*客户月报/ })).not.toBeInTheDocument()
 
-    fireEvent.change(screen.getByLabelText('邮件正文'), { target: { value: '客户您好，\n本月进度为 {{progress}}%。' } })
+    pasteBody('<p>本月进度变量：{{progress}}%</p>', '本月进度变量：{{progress}}%')
     fireEvent.change(screen.getByLabelText('默认 JSON'), { target: { value: '{"progress":70}' } })
     fireEvent.click(screen.getByRole('button', { name: '保存模板' }))
     expect(screen.getByRole('button', { name: /客户月报.*客户月报/ })).toBeInTheDocument()
@@ -125,5 +131,15 @@ describe('mail template reuse page', () => {
     await waitFor(() => expect(screen.getByText('文件内容无效')).toBeInTheDocument())
     expect(screen.getByDisplayValue('正在编辑的模板')).toBeInTheDocument()
     expect(screen.getByDisplayValue('{"progress":88}')).toBeInTheDocument()
+  })
+
+  it('inserts and pastes editable tables in the rich body', () => {
+    render(<MailTemplatePage />)
+    fireEvent.click(screen.getByRole('button', { name: '插入表格' }))
+    expect(screen.getByLabelText('邮件正文').querySelector('table')).toBeInTheDocument()
+
+    pasteBody('<table><tr><td style="background-color:#ffff00;border:1px solid #000000">Excel</td><td>70%</td></tr></table>', 'Excel\t70%')
+    expect(screen.getByText('Excel 表格已按安全邮件格式粘贴。')).toBeInTheDocument()
+    expect(screen.getByLabelText('邮件正文').querySelectorAll('table').length).toBeGreaterThanOrEqual(2)
   })
 })

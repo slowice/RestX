@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import {
   AlertCircle,
   Check,
+  Clipboard,
   Copy,
   FileJson,
   FileUp,
@@ -14,24 +15,27 @@ import {
 import { PageHeader } from '../../../platform/renderer/components/PageHeader'
 import type { ImportedMailMessage, JsonObject, MailTemplate } from '../shared/contracts'
 import { parseJsonObject, renderMailTemplate, validateMailTemplate } from '../shared/template-engine'
+import { highlightMissingVariables, mailHtmlToText, plainTextToMailHtml, sanitizeMailHtml } from '../shared/rich-body'
 import {
   createBlankTemplate,
   duplicateMailTemplate,
-  loadMailTemplates,
+  loadMailTemplateLibrary,
   saveMailTemplates
 } from './template-storage'
+import { RichMailEditor } from './RichMailEditor'
 import './mail-template.css'
 
-type TemplateForm = Omit<MailTemplate, 'defaults'> & { defaultsJson: string }
+type TemplateForm = Omit<MailTemplate, 'defaults' | 'bodyText'> & { defaultsJson: string }
 type Notice = { kind: 'success' | 'error'; text: string }
 
 export function MailTemplatePage(): React.JSX.Element {
-  const initialTemplates = useMemo(() => loadMailTemplates(localStorage), [])
+  const initialLibrary = useMemo(() => loadMailTemplateLibrary(localStorage), [])
+  const initialTemplates = initialLibrary.templates
   const [templates, setTemplates] = useState(initialTemplates)
   const [selectedId, setSelectedId] = useState<string | null>(initialTemplates[0]?.id ?? null)
   const [form, setForm] = useState<TemplateForm>(() => toForm(initialTemplates[0] ?? createBlankTemplate()))
   const [perSendJson, setPerSendJson] = useState('{}')
-  const [notice, setNotice] = useState<Notice | null>(null)
+  const [notice, setNotice] = useState<Notice | null>(() => initialLibrary.error ? { kind: 'error', text: initialLibrary.error } : null)
   const [opening, setOpening] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importedSource, setImportedSource] = useState<ImportedMailMessage | null>(null)
@@ -90,7 +94,8 @@ export function MailTemplatePage(): React.JSX.Element {
         cc: imported.cc,
         bcc: imported.bcc,
         subject: imported.subject,
-        body: imported.body
+        bodyHtml: plainTextToMailHtml(imported.body),
+        bodyText: imported.body
       }
       setSelectedId(importedTemplate.id)
       setForm(toForm(importedTemplate))
@@ -163,6 +168,20 @@ export function MailTemplatePage(): React.JSX.Element {
     }
   }
 
+  const copyRichBody = async (): Promise<void> => {
+    if (!canOpen) return
+    try {
+      if (!globalThis.ClipboardItem || !navigator.clipboard?.write) throw new Error('当前环境不支持富文本剪贴板。')
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([rendered.draft.bodyHtml], { type: 'text/html' }),
+        'text/plain': new Blob([rendered.draft.bodyText], { type: 'text/plain' })
+      })])
+      setNotice({ kind: 'success', text: '已复制富文本正文，可直接粘贴到 Outlook。' })
+    } catch (reason) {
+      setNotice({ kind: 'error', text: errorMessage(reason, '复制失败，请在预览区手动选择正文。') })
+    }
+  }
+
   return (
     <div className="page mail-template-page">
       <PageHeader
@@ -204,7 +223,13 @@ export function MailTemplatePage(): React.JSX.Element {
               <Field label="密送 BCC"><textarea aria-label="密送 BCC" rows={2} value={form.bcc} onChange={(event) => updateForm(setForm, 'bcc', event.target.value)} /></Field>
             </div>
             <Field label="邮件标题"><input aria-label="邮件标题" value={form.subject} onChange={(event) => updateForm(setForm, 'subject', event.target.value)} /></Field>
-            <Field label="邮件正文" hint="用 {{变量名}} 标记每次需要替换的内容"><textarea aria-label="邮件正文" className="body-editor" rows={9} value={form.body} onChange={(event) => updateForm(setForm, 'body', event.target.value)} /></Field>
+            <Field label="邮件正文" hint="支持从 Excel 直接粘贴表格；用 {{变量名}} 标记每次需要替换的内容">
+              <RichMailEditor
+                value={form.bodyHtml}
+                onChange={(value) => updateForm(setForm, 'bodyHtml', value)}
+                onNotice={(text, kind = 'success') => setNotice({ kind, text })}
+              />
+            </Field>
             <Field label="默认 JSON" hint="本次没有填写的变量会使用这里的默认值"><textarea aria-label="默认 JSON" className={`json-editor ${defaultsResult.ok ? '' : 'invalid'}`} rows={9} spellCheck={false} value={form.defaultsJson} onChange={(event) => updateForm(setForm, 'defaultsJson', event.target.value)} /></Field>
             {!defaultsResult.ok && <InlineError text={defaultsResult.error} />}
           </div>
@@ -227,14 +252,16 @@ export function MailTemplatePage(): React.JSX.Element {
               {rendered.draft.cc.length > 0 && <PreviewRecipients label="抄送" values={rendered.draft.cc} />}
               {rendered.draft.bcc.length > 0 && <PreviewRecipients label="密送" values={rendered.draft.bcc} />}
               <div className="preview-subject"><span>标题</span><strong>{highlightPlaceholders(rendered.draft.subject) || '（空）'}</strong></div>
-              <pre className="preview-body">{highlightPlaceholders(rendered.draft.body) || '（正文为空）'}</pre>
+              {rendered.draft.bodyText
+                ? <div className="preview-body rich-preview" dangerouslySetInnerHTML={{ __html: highlightMissingVariables(rendered.draft.bodyHtml, rendered.missingVariables) }} />
+                : <div className="preview-body empty-preview">（正文为空）</div>}
             </div>
 
             {allIssues.length > 0 && <div className="issue-list" role="alert"><div><AlertCircle size={15} /><strong>还需要处理</strong></div><ul>{allIssues.map((issue, index) => <li key={`${issue}-${index}`}>{issue}</li>)}</ul></div>}
           </div>
           <div className="handoff-actions">
-            <div><strong>不会自动发送</strong><span>打开 Outlook 后由你最后确认</span></div>
-            <button className="button primary large" disabled={!canOpen} onClick={() => void openMailClient()}><Send size={15} />{opening ? '正在打开…' : '在 Outlook 中打开'}</button>
+            <div><strong>不会自动发送</strong><span>打开经典 Outlook 后由你最后确认</span></div>
+            <div className="handoff-buttons"><button className="button" disabled={!canOpen} onClick={() => void copyRichBody()}><Clipboard size={14} />复制富文本正文</button><button className="button primary large" disabled={!canOpen} onClick={() => void openMailClient()}><Send size={15} />{opening ? '正在打开…' : '在 Outlook 中打开'}</button></div>
           </div>
         </section>
       </div>
@@ -262,22 +289,24 @@ function highlightPlaceholders(source: string): React.ReactNode {
 }
 
 function toForm(template: MailTemplate): TemplateForm {
-  return { ...template, defaultsJson: JSON.stringify(template.defaults, null, 2) }
+  const { bodyText: _bodyText, ...fields } = template
+  return { ...fields, defaultsJson: JSON.stringify(template.defaults, null, 2) }
 }
 
 function fromForm(form: TemplateForm, defaults: JsonObject): MailTemplate {
   const { defaultsJson: _defaultsJson, ...template } = form
-  return { ...template, defaults }
+  const bodyHtml = sanitizeMailHtml(template.bodyHtml).html
+  return { ...template, bodyHtml, bodyText: mailHtmlToText(bodyHtml), defaults }
 }
 
 function updateForm(setForm: React.Dispatch<React.SetStateAction<TemplateForm>>, field: keyof TemplateForm, value: string): void {
   setForm((current) => ({ ...current, [field]: value }))
 }
 
-function errorMessage(reason: unknown): string {
+function errorMessage(reason: unknown, fallback = '无法打开经典 Outlook，请复制富文本正文后手动新建邮件。'): string {
   return reason instanceof Error
     ? reason.message.replace(/^Error invoking remote method '[^']+': Error: /, '')
-    : '无法打开邮件软件，请复制预览内容后手动新建邮件。'
+    : fallback
 }
 
 function templateNameFromSource(sourceName: string): string {
