@@ -34,7 +34,8 @@ function makeApi(): RestXApi {
       })), previewSource: vi.fn(async () => preview), run: vi.fn(async () => result), getGitCodeSettings: vi.fn(), updateGitCodeSettings: vi.fn(), testGitCodeConnection: vi.fn(), getCodeHubSettings: vi.fn(), updateCodeHubSettings: vi.fn(), clearCache: vi.fn()
     },
     knowledge: { scan: vi.fn(), read: vi.fn(), classify: vi.fn(), apply: vi.fn(), saveEdits: vi.fn(), open: vi.fn(), openRoot: vi.fn() },
-    mailTemplates: { openDraft: vi.fn(), importMessage: vi.fn() }
+    mailTemplates: { openDraft: vi.fn(), importMessage: vi.fn() },
+    frequentSkills: { list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(), importSkill: vi.fn(), execute: vi.fn() }
   }
 }
 

@@ -86,6 +86,9 @@ function installApi(): RestXApi {
     },
     mailTemplates: {
       openDraft: vi.fn(), importMessage: vi.fn()
+    },
+    frequentSkills: {
+      list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(), importSkill: vi.fn(), execute: vi.fn()
     }
   }
   Object.defineProperty(window, 'restx', { configurable: true, value: api })

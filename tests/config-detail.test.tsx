@@ -39,7 +39,8 @@ function makeApi(consent: boolean): RestXApi {
     presets: { list: vi.fn(async () => []), generateDraft: vi.fn(), save: vi.fn(), setEnabled: vi.fn(), delete: vi.fn() },
     codeReview: { listMyGitCodeMergeRequests: vi.fn(), previewSource: vi.fn(), run: vi.fn(), getGitCodeSettings: vi.fn(), updateGitCodeSettings: vi.fn(), testGitCodeConnection: vi.fn(), getCodeHubSettings: vi.fn(), updateCodeHubSettings: vi.fn(), clearCache: vi.fn() },
     knowledge: { scan: vi.fn(), read: vi.fn(), classify: vi.fn(), apply: vi.fn(), saveEdits: vi.fn(), open: vi.fn(), openRoot: vi.fn() },
-    mailTemplates: { openDraft: vi.fn(async () => undefined), importMessage: vi.fn(async () => null) }
+    mailTemplates: { openDraft: vi.fn(async () => undefined), importMessage: vi.fn(async () => null) },
+    frequentSkills: { list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(), importSkill: vi.fn(), execute: vi.fn() }
   }
 }
 

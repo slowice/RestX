@@ -5,10 +5,11 @@ import { labFeature } from '../../features/lab/renderer/feature'
 import { knowledgeMapFeature } from '../../features/knowledge-map/renderer/feature'
 import { mailTemplateFeature } from '../../features/mail-template/renderer/feature'
 import { settingsFeature } from '../../features/settings/renderer/feature'
+import { frequentSkillsFeature } from '../../features/frequent-skills/renderer/feature'
 import { validateFeatureDefinitions } from '../shared/feature-validation'
 import type { RendererFeature } from './define-feature'
 
-const registeredFeatures = [homeFeature, aiInspectorFeature, knowledgeMapFeature, codeReviewFeature, mailTemplateFeature, labFeature, settingsFeature] satisfies readonly RendererFeature[]
+const registeredFeatures = [homeFeature, aiInspectorFeature, knowledgeMapFeature, frequentSkillsFeature, codeReviewFeature, mailTemplateFeature, labFeature, settingsFeature] satisfies readonly RendererFeature[]
 
 export type RendererFeatureRegistry = {
   features: RendererFeature[]
