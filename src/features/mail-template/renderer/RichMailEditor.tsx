@@ -6,11 +6,15 @@ import { BackgroundColor, Color, FontFamily, FontSize, TextStyle } from '@tiptap
 import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table'
 import { normalizeClipboardTable } from './excel-paste'
 import { sanitizeMailHtml, sanitizeMailStyle } from '../shared/rich-body'
+import { useAdaptiveMailScale } from './use-adaptive-mail-scale'
 
 type RichMailEditorProps = {
   value: string
   onChange(value: string): void
   onNotice(message: string, kind?: 'success' | 'error'): void
+  autoScale: boolean
+  layoutKey: string
+  onScaleChange(scale: number): void
 }
 
 const StyledTable = Table.extend({
@@ -37,7 +41,7 @@ const StyledTableHeader = TableHeader.extend({
   }
 })
 
-export function RichMailEditor({ value, onChange, onNotice }: RichMailEditorProps): React.JSX.Element {
+export function RichMailEditor({ value, onChange, onNotice, autoScale, layoutKey, onScaleChange }: RichMailEditorProps): React.JSX.Element {
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -56,12 +60,15 @@ export function RichMailEditor({ value, onChange, onNotice }: RichMailEditorProp
     editorProps: { attributes: { class: 'rich-mail-content', 'aria-label': '邮件正文' } },
     onUpdate: ({ editor }) => onChange(sanitizeMailHtml(editor.getHTML()).html)
   })
+  const { viewportRef, contentRef, scale } = useAdaptiveMailScale(autoScale, `${layoutKey}:${editor ? 'ready' : 'loading'}`)
 
   useEffect(() => {
     if (!editor || editor.isDestroyed) return
     const sanitized = sanitizeMailHtml(value).html
     if (sanitizeMailHtml(editor.getHTML()).html !== sanitized) editor.commands.setContent(sanitized, { emitUpdate: false })
   }, [editor, value])
+
+  useEffect(() => onScaleChange(scale), [onScaleChange, scale])
 
   if (!editor) return <div className="rich-mail-editor loading">正在加载正文编辑器…</div>
 
@@ -94,7 +101,11 @@ export function RichMailEditor({ value, onChange, onNotice }: RichMailEditorProp
   return (
     <div className="rich-mail-editor" onPasteCapture={handlePaste}>
       <EditorToolbar editor={editor} />
-      <EditorContent editor={editor} />
+      <div ref={viewportRef} className="mail-scale-viewport editor-scale-viewport">
+        <div ref={contentRef} className="mail-scale-surface" style={{ zoom: scale }}>
+          <EditorContent editor={editor} />
+        </div>
+      </div>
     </div>
   )
 }

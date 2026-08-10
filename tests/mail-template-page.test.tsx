@@ -6,6 +6,13 @@ import type { RestXApi } from '../src/app-api'
 import type { ImportedMailMessage } from '../src/features/mail-template/shared/contracts'
 import { MailTemplatePage } from '../src/features/mail-template/renderer/MailTemplatePage'
 
+if (typeof Range !== 'undefined' && typeof Range.prototype.getClientRects !== 'function') {
+  Object.defineProperties(Range.prototype, {
+    getClientRects: { value: () => [] },
+    getBoundingClientRect: { value: () => new DOMRect() }
+  })
+}
+
 function installApi() {
   const openDraft = vi.fn(async () => undefined)
   const importMessage = vi.fn<() => Promise<ImportedMailMessage | null>>(async () => null)
@@ -143,18 +150,35 @@ describe('mail template reuse page', () => {
     expect(screen.getByLabelText('邮件正文').querySelectorAll('table').length).toBeGreaterThanOrEqual(2)
   })
 
-  it('enters and exits focus mode without losing rich body edits', () => {
+  it('expands editor and preview independently without losing rich body edits', () => {
     const { container } = render(<MailTemplatePage />)
     pasteBody('<table><tr><td>专注模式表格</td><td>保留内容</td></tr></table>', '专注模式表格\t保留内容')
 
-    fireEvent.click(screen.getAllByRole('button', { name: '展开正文工作区' })[0])
-    expect(container.querySelector('.mail-template-page')).toHaveClass('is-focus-mode')
-    expect(screen.getAllByRole('button', { name: '退出专注模式' })).toHaveLength(2)
+    fireEvent.click(screen.getByRole('button', { name: '展开编辑区' }))
+    expect(container.querySelector('.mail-template-page')).toHaveClass('is-focus-mode', 'mode-editor')
     expect(screen.getByLabelText('邮件正文')).toHaveTextContent('专注模式表格')
+
+    fireEvent.click(screen.getByRole('button', { name: '切换到预览区' }))
+    expect(container.querySelector('.mail-template-page')).toHaveClass('mode-preview')
 
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(container.querySelector('.mail-template-page')).not.toHaveClass('is-focus-mode')
+    expect(container.querySelector('.mail-template-page')).toHaveClass('mode-normal')
     expect(screen.getByLabelText('邮件正文')).toHaveTextContent('专注模式表格')
+  })
+
+  it('toggles adaptive display without writing scale styles into the mail body', () => {
+    render(<MailTemplatePage />)
+    pasteBody('<table style="width:900px"><tr><td>宽表格</td><td>内容</td></tr></table>', '宽表格\t内容')
+
+    const autoButtons = screen.getAllByRole('button', { name: /自动缩放/ })
+    expect(autoButtons).toHaveLength(2)
+    fireEvent.click(autoButtons[0])
+    expect(screen.getAllByRole('button', { name: '实际大小 100%' })).toHaveLength(2)
+
+    const editorBody = screen.getByLabelText('邮件正文')
+    expect(editorBody.innerHTML).not.toMatch(/zoom|transform|mail-scale/i)
+    expect(document.querySelector('.preview-body')?.innerHTML).not.toMatch(/zoom|transform|mail-scale/i)
   })
 
   it('preserves Excel borders and merged cells through the editor and preview', async () => {

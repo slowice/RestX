@@ -15,6 +15,7 @@
 .workspace-heading .unsaved-dot { color: #9a6200; }
 .workspace-heading-actions { display: flex; min-width: 0; align-items: center; gap: 7px; }
 .workspace-focus-button { height: 28px !important; padding: 0 8px !important; font-size: 9px !important; }
+.mail-scale-button { height: 28px !important; padding: 0 8px !important; color: #087d62 !important; font-size: 9px !important; white-space: nowrap; }
 
 .template-list { display: flex; flex: 1; flex-direction: column; gap: 6px; padding: 9px; overflow-y: auto; }
 .template-card { display: grid; grid-template-columns: 27px minmax(0, 1fr); align-items: center; gap: 8px; width: 100%; padding: 10px; color: #555; border: 1px solid transparent; border-radius: 9px; background: transparent; text-align: left; cursor: pointer; }
@@ -57,12 +58,15 @@
 .color-tool { gap: 4px; }
 .color-tool span { white-space: nowrap; }
 .color-tool input { width: 15px; height: 15px; padding: 0; overflow: hidden; border: 0; border-radius: 3px; cursor: pointer; }
-.rich-mail-content { min-height: 175px; max-height: 360px; padding: 10px; overflow: auto; color: #202020; outline: none; font: 10px/1.55 Inter, system-ui, sans-serif; }
+.mail-scale-viewport { min-width: 0; overflow: auto; }
+.mail-scale-surface { min-width: 100%; transform-origin: top left; }
+.editor-scale-viewport { min-height: 175px; max-height: 360px; }
+.rich-mail-content { min-height: 175px; padding: 10px; color: #202020; outline: none; font: 10px/1.55 Inter, system-ui, sans-serif; }
 .rich-mail-content > :first-child, .rich-preview > :first-child { margin-top: 0; }
 .rich-mail-content > :last-child, .rich-preview > :last-child { margin-bottom: 0; }
 .rich-mail-content p, .rich-preview p { margin: 0 0 7px; }
-.rich-mail-content .tableWrapper, .rich-preview { overflow-x: auto; }
-.rich-mail-content table, .rich-preview table { width: auto; max-width: 100%; border-collapse: collapse; table-layout: fixed; }
+.rich-mail-content .tableWrapper { overflow: visible; }
+.rich-mail-content table, .rich-preview table { width: max-content; max-width: none; border-collapse: collapse; table-layout: fixed; }
 .rich-mail-content td, .rich-mail-content th, .rich-preview td, .rich-preview th { min-width: 50px; padding: 4px; border: 1px solid #b8b8b8; vertical-align: middle; }
 .rich-mail-content th, .rich-preview th { background: #f4f4f4; font-weight: 700; }
 .rich-mail-content .selectedCell::after { position: absolute; inset: 0; z-index: 2; content: ''; pointer-events: none; background: rgba(16, 163, 127, .14); }
@@ -89,7 +93,8 @@
 .preview-recipients em { padding: 2px 5px; color: #4c4c4c; border-radius: 4px; background: #f1f1f1; font-size: 8px; font-style: normal; }
 .preview-recipients i { color: #aaa; font-size: 8px; font-style: normal; }
 .preview-subject strong { overflow-wrap: anywhere; color: #242424; font-size: 10px; }
-.preview-body { min-height: 185px; max-height: 320px; margin: 0; padding: 13px; overflow: auto; color: #353535; background: #fff; font: 10px/1.7 Inter, system-ui, sans-serif; overflow-wrap: anywhere; }
+.preview-scale-viewport { min-height: 185px; max-height: 320px; background: #fff; }
+.preview-body { min-height: 185px; margin: 0; padding: 13px; color: #353535; background: #fff; font: 10px/1.7 Inter, system-ui, sans-serif; overflow-wrap: anywhere; }
 .empty-preview { white-space: pre-wrap; }
 .preview-card mark { padding: 1px 2px; color: #9a5200; border-radius: 3px; background: #fff0c9; }
 .issue-list { margin-top: 10px; padding: 10px 11px; color: #8a4b00; border: 1px solid #efdaac; border-radius: 9px; background: #fffaf0; }
@@ -105,13 +110,15 @@
 .mail-template-page.is-focus-mode { display: flex; width: calc(100% - 28px); height: 100vh; padding: 14px 0; overflow: hidden; flex-direction: column; }
 .mail-template-page.is-focus-mode .page-header { display: none; }
 .mail-template-page.is-focus-mode .mail-notice { flex: none; }
-.mail-template-page.is-focus-mode .mail-template-workspace { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); flex: 1; min-height: 0; }
+.mail-template-page.is-focus-mode .mail-template-workspace { grid-template-columns: minmax(0, 1fr); flex: 1; min-height: 0; }
 .mail-template-page.is-focus-mode .template-library,
 .mail-template-page.is-focus-mode .mail-editor-secondary,
 .mail-template-page.is-focus-mode .mail-reuse-secondary,
 .mail-template-page.is-focus-mode .preview-context,
 .mail-template-page.is-focus-mode .import-summary { display: none; }
-.mail-template-page.is-focus-mode .template-editor { min-height: 0; border-right: 1px solid #e5e5e5; }
+.mail-template-page.is-focus-mode.mode-editor .reuse-panel,
+.mail-template-page.is-focus-mode.mode-preview .template-editor { display: none; }
+.mail-template-page.is-focus-mode .template-editor { min-height: 0; border-right: 0; }
 .mail-template-page.is-focus-mode .reuse-panel { min-height: 0; }
 .mail-template-page.is-focus-mode .editor-scroll,
 .mail-template-page.is-focus-mode .reuse-content { display: flex; min-height: 0; padding: 12px; overflow: hidden; flex-direction: column; }
@@ -119,12 +126,11 @@
 .mail-template-page.is-focus-mode .mail-body-focus > .mail-field { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 .mail-template-page.is-focus-mode .mail-body-focus > .mail-field { margin-bottom: 0; }
 .mail-template-page.is-focus-mode .rich-mail-editor { display: flex; flex: 1; min-height: 0; flex-direction: column; }
-.mail-template-page.is-focus-mode .rich-mail-editor > div:last-child { display: flex; flex: 1; min-height: 0; }
-.mail-template-page.is-focus-mode .rich-mail-content { flex: 1; min-height: 0; max-height: none; }
-.mail-template-page.is-focus-mode .rich-mail-content table,
-.mail-template-page.is-focus-mode .rich-preview table { max-width: none; }
+.mail-template-page.is-focus-mode .editor-scale-viewport { flex: 1; min-height: 0; max-height: none; }
+.mail-template-page.is-focus-mode .rich-mail-content { min-height: 100%; }
 .mail-template-page.is-focus-mode .preview-card { display: flex; flex: 1; min-height: 0; margin-top: 0; flex-direction: column; }
-.mail-template-page.is-focus-mode .preview-body { flex: 1; min-height: 0; max-height: none; }
+.mail-template-page.is-focus-mode .preview-scale-viewport { flex: 1; min-height: 0; max-height: none; }
+.mail-template-page.is-focus-mode .preview-body { min-height: 100%; }
 .mail-template-page.is-focus-mode .issue-list { flex: none; }
 
 @media (max-width: 1180px) {

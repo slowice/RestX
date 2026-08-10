@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle,
+  ArrowLeftRight,
   Check,
   Clipboard,
   Copy,
@@ -25,10 +26,13 @@ import {
   saveMailTemplates
 } from './template-storage'
 import { RichMailEditor } from './RichMailEditor'
+import { useAdaptiveMailScale } from './use-adaptive-mail-scale'
 import './mail-template.css'
 
 type TemplateForm = Omit<MailTemplate, 'defaults' | 'bodyText'> & { defaultsJson: string }
 type Notice = { kind: 'success' | 'error'; text: string }
+type WorkspaceMode = 'normal' | 'editor' | 'preview'
+type ScaleMode = 'auto' | 'actual'
 
 export function MailTemplatePage(): React.JSX.Element {
   const initialLibrary = useMemo(() => loadMailTemplateLibrary(localStorage), [])
@@ -41,17 +45,20 @@ export function MailTemplatePage(): React.JSX.Element {
   const [opening, setOpening] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importedSource, setImportedSource] = useState<ImportedMailMessage | null>(null)
-  const [focusMode, setFocusMode] = useState(false)
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('normal')
+  const [scaleMode, setScaleMode] = useState<ScaleMode>('auto')
+  const [editorScale, setEditorScale] = useState(1)
+  const [previewScale, setPreviewScale] = useState(1)
   const scrollTopBeforeFocus = useRef(0)
   const focusModeWasActive = useRef(false)
 
   useEffect(() => {
     const mainContent = document.querySelector<HTMLElement>('.main-content')
-    if (focusMode) {
+    if (workspaceMode !== 'normal') {
       mainContent?.scrollTo?.({ top: 0 })
       focusModeWasActive.current = true
       const exitOnEscape = (event: KeyboardEvent): void => {
-        if (event.key === 'Escape') setFocusMode(false)
+        if (event.key === 'Escape') setWorkspaceMode('normal')
       }
       document.addEventListener('keydown', exitOnEscape)
       return () => document.removeEventListener('keydown', exitOnEscape)
@@ -60,7 +67,7 @@ export function MailTemplatePage(): React.JSX.Element {
       mainContent?.scrollTo?.({ top: scrollTopBeforeFocus.current })
       focusModeWasActive.current = false
     }
-  }, [focusMode])
+  }, [workspaceMode])
 
   const defaultsResult = useMemo(() => parseJsonObject(form.defaultsJson), [form.defaultsJson])
   const perSendResult = useMemo(() => parseJsonObject(perSendJson), [perSendJson])
@@ -81,9 +88,9 @@ export function MailTemplatePage(): React.JSX.Element {
   const isDirty = !savedTemplate || JSON.stringify(toForm(savedTemplate)) !== JSON.stringify(form)
   const canOpen = allIssues.length === 0 && !opening
 
-  const enterFocusMode = (): void => {
+  const enterFocusMode = (mode: Exclude<WorkspaceMode, 'normal'>): void => {
     scrollTopBeforeFocus.current = document.querySelector<HTMLElement>('.main-content')?.scrollTop ?? 0
-    setFocusMode(true)
+    setWorkspaceMode(mode)
   }
 
   const persist = (next: MailTemplate[]): void => {
@@ -210,7 +217,7 @@ export function MailTemplatePage(): React.JSX.Element {
   }
 
   return (
-    <div className={`page mail-template-page${focusMode ? ' is-focus-mode' : ''}`}>
+    <div className={`page mail-template-page mode-${workspaceMode}${workspaceMode !== 'normal' ? ' is-focus-mode' : ''}`} data-workspace-mode={workspaceMode}>
       <PageHeader
         eyebrow="MAIL TEMPLATES"
         title="邮件模板"
@@ -244,7 +251,8 @@ export function MailTemplatePage(): React.JSX.Element {
             <span>模板内容</span>
             <div className="workspace-heading-actions">
               {isDirty && <small className="unsaved-dot">未保存</small>}
-              <FocusModeButton active={focusMode} enter={enterFocusMode} exit={() => setFocusMode(false)} />
+              <ScaleModeButton mode={scaleMode} scale={editorScale} onToggle={() => setScaleMode((current) => current === 'auto' ? 'actual' : 'auto')} />
+              <FocusModeButtons pane="editor" mode={workspaceMode} enter={enterFocusMode} exit={() => setWorkspaceMode('normal')} />
             </div>
           </div>
           {importedSource && <div className="import-summary"><FileUp size={16} /><div><strong>已导入 {importedSource.format.toUpperCase()}</strong><span>{importedSource.sourceName}</span><small>请把每次变化的内容改成 {'{{变量名}}'}，再点击保存模板。</small>{importedSource.warnings.map((warning) => <em key={warning}>{warning}</em>)}</div></div>}
@@ -264,6 +272,9 @@ export function MailTemplatePage(): React.JSX.Element {
                   value={form.bodyHtml}
                   onChange={(value) => updateForm(setForm, 'bodyHtml', value)}
                   onNotice={(text, kind = 'success') => setNotice({ kind, text })}
+                  autoScale={scaleMode === 'auto'}
+                  layoutKey={workspaceMode}
+                  onScaleChange={setEditorScale}
                 />
               </Field>
             </div>
@@ -284,7 +295,8 @@ export function MailTemplatePage(): React.JSX.Element {
             <span>本次邮件</span>
             <div className="workspace-heading-actions">
               <small>JSON 可只填变化内容</small>
-              <FocusModeButton active={focusMode} enter={enterFocusMode} exit={() => setFocusMode(false)} />
+              <ScaleModeButton mode={scaleMode} scale={previewScale} onToggle={() => setScaleMode((current) => current === 'auto' ? 'actual' : 'auto')} />
+              <FocusModeButtons pane="preview" mode={workspaceMode} enter={enterFocusMode} exit={() => setWorkspaceMode('normal')} />
             </div>
           </div>
           <div className="reuse-content">
@@ -301,9 +313,12 @@ export function MailTemplatePage(): React.JSX.Element {
                 {rendered.draft.bcc.length > 0 && <PreviewRecipients label="密送" values={rendered.draft.bcc} />}
                 <div className="preview-subject"><span>标题</span><strong>{highlightPlaceholders(rendered.draft.subject) || '（空）'}</strong></div>
               </div>
-              {rendered.draft.bodyText
-                ? <div className="preview-body rich-preview" dangerouslySetInnerHTML={{ __html: highlightMissingVariables(rendered.draft.bodyHtml, rendered.missingVariables) }} />
-                : <div className="preview-body empty-preview">（正文为空）</div>}
+              <AdaptivePreviewBody
+                html={rendered.draft.bodyText ? highlightMissingVariables(rendered.draft.bodyHtml, rendered.missingVariables) : null}
+                autoScale={scaleMode === 'auto'}
+                layoutKey={workspaceMode}
+                onScaleChange={setPreviewScale}
+              />
             </div>
 
             {allIssues.length > 0 && <div className="issue-list" role="alert"><div><AlertCircle size={15} /><strong>还需要处理</strong></div><ul>{allIssues.map((issue, index) => <li key={`${issue}-${index}`}>{issue}</li>)}</ul></div>}
@@ -318,10 +333,33 @@ export function MailTemplatePage(): React.JSX.Element {
   )
 }
 
-function FocusModeButton({ active, enter, exit }: { active: boolean; enter(): void; exit(): void }): React.JSX.Element {
-  return active
-    ? <button type="button" className="button compact workspace-focus-button" aria-label="退出专注模式" onClick={exit}><Minimize2 size={13} />退出专注</button>
-    : <button type="button" className="button compact workspace-focus-button" aria-label="展开正文工作区" onClick={enter}><Maximize2 size={13} />展开</button>
+function FocusModeButtons({ pane, mode, enter, exit }: { pane: Exclude<WorkspaceMode, 'normal'>; mode: WorkspaceMode; enter(mode: Exclude<WorkspaceMode, 'normal'>): void; exit(): void }): React.JSX.Element {
+  if (mode === 'normal') {
+    const label = pane === 'editor' ? '展开编辑区' : '展开预览区'
+    return <button type="button" className="button compact workspace-focus-button" aria-label={label} onClick={() => enter(pane)}><Maximize2 size={13} />展开</button>
+  }
+  const other = pane === 'editor' ? 'preview' : 'editor'
+  return <>
+    <button type="button" className="button compact workspace-focus-button" aria-label={pane === 'editor' ? '切换到预览区' : '切换到编辑区'} onClick={() => enter(other)}><ArrowLeftRight size={13} />{pane === 'editor' ? '切换到预览' : '切换到编辑'}</button>
+    <button type="button" className="button compact workspace-focus-button" aria-label="退出专注模式" onClick={exit}><Minimize2 size={13} />退出专注</button>
+  </>
+}
+
+function ScaleModeButton({ mode, scale, onToggle }: { mode: ScaleMode; scale: number; onToggle(): void }): React.JSX.Element {
+  const percent = Math.round(scale * 100)
+  return <button type="button" className="button compact mail-scale-button" aria-label={mode === 'auto' ? `自动缩放 ${percent}%` : '实际大小 100%'} onClick={onToggle}>{mode === 'auto' ? `自动 ${percent}%` : '实际大小 100%'}</button>
+}
+
+function AdaptivePreviewBody({ html, autoScale, layoutKey, onScaleChange }: { html: string | null; autoScale: boolean; layoutKey: string; onScaleChange(scale: number): void }): React.JSX.Element {
+  const { viewportRef, contentRef, scale } = useAdaptiveMailScale(autoScale, layoutKey)
+  useEffect(() => onScaleChange(scale), [onScaleChange, scale])
+  return <div ref={viewportRef} className="mail-scale-viewport preview-scale-viewport">
+    <div ref={contentRef} className="mail-scale-surface" style={{ zoom: scale }}>
+      {html
+        ? <div className="preview-body rich-preview" dangerouslySetInnerHTML={{ __html: html }} />
+        : <div className="preview-body empty-preview">（正文为空）</div>}
+    </div>
+  </div>
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }): React.JSX.Element {
