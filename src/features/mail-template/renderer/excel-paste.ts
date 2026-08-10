@@ -2,8 +2,12 @@ import { MAIL_TEMPLATE_LIMITS } from '../shared/contracts'
 import { escapeHtml, sanitizeMailHtml, sanitizeMailStyle } from '../shared/rich-body'
 
 export type ClipboardTableResult = {
+  kind: 'table'
   html: string
   mode: 'excel-html' | 'tabular-text'
+} | {
+  kind: 'rejected'
+  message: string
 }
 
 const SUPPORTED_STYLE_PROPERTIES = new Set([
@@ -15,12 +19,16 @@ const SUPPORTED_STYLE_PROPERTIES = new Set([
 ])
 
 export function normalizeClipboardTable(input: { html: string; text: string }): ClipboardTableResult | null {
-  if (input.html && input.html.length <= MAIL_TEMPLATE_LIMITS.clipboardHtml) {
+  const hasHtmlTable = /<table(?:\s|>)/i.test(input.html)
+  if (hasHtmlTable) {
+    if (input.html.length > MAIL_TEMPLATE_LIMITS.clipboardHtml) return rejectedRichTable()
     const converted = normalizeExcelHtml(input.html)
-    if (converted) return { html: converted, mode: 'excel-html' }
+    return converted
+      ? { kind: 'table', html: converted, mode: 'excel-html' }
+      : rejectedRichTable()
   }
   const fallback = tabularTextToHtml(input.text)
-  return fallback ? { html: fallback, mode: 'tabular-text' } : null
+  return fallback ? { kind: 'table', html: fallback, mode: 'tabular-text' } : null
 }
 
 export function normalizeExcelHtml(source: string): string | null {
@@ -42,7 +50,7 @@ export function normalizeExcelHtml(source: string): string | null {
   for (const cell of cells) boundCellSpans(cell)
 
   const html = sanitizeMailHtml(table.outerHTML).html
-  return html.includes('<table') ? html : null
+  return html.includes('<table') && html.length <= MAIL_TEMPLATE_LIMITS.bodyHtml ? html : null
 }
 
 export function tabularTextToHtml(source: string): string | null {
@@ -139,4 +147,8 @@ function boundCellSpans(cell: Element): void {
 function normalizeLegacyLength(value: string): string {
   const trimmed = value.trim()
   return /^\d+(?:\.\d+)?%$/.test(trimmed) ? trimmed : /^\d+(?:\.\d+)?$/.test(trimmed) ? `${trimmed}px` : trimmed
+}
+
+function rejectedRichTable(): ClipboardTableResult {
+  return { kind: 'rejected', message: 'Excel 表格过大或结构超出安全处理范围，请缩小复制范围后重试。' }
 }

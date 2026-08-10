@@ -12,6 +12,15 @@ describe('rich mail body boundary', () => {
     expect(sanitized.changed).toBe(true)
   })
 
+  it('keeps browser-normalized RGB and multi-value cell borders', () => {
+    const source = '<table><tr><td style="border:0.5pt solid rgb(0, 0, 0);border-color:rgb(255, 0, 0) rgb(0, 128, 0) rgb(0, 0, 255) rgb(0, 0, 0);border-style:double solid dotted dashed;border-width:1pt 0.5pt 2px 1px">A</td></tr></table>'
+    const html = sanitizeMailHtml(source).html
+    expect(html).toContain('border:0.5pt solid rgb(0, 0, 0)')
+    expect(html).toContain('border-color:rgb(255, 0, 0) rgb(0, 128, 0) rgb(0, 0, 255) rgb(0, 0, 0)')
+    expect(html).toContain('border-style:double solid dotted dashed')
+    expect(html).toContain('border-width:1pt 0.5pt 2px 1px')
+  })
+
   it('renders placeholders only as escaped text inside rich nodes', () => {
     const rendered = renderRichBody('<table><tr><td>{{owner.name}}</td><td>{{missing}}</td></tr></table>', { owner: { name: '<script>bad()</script>' } })
     expect(rendered.html).toContain('&lt;script&gt;bad()&lt;/script&gt;')

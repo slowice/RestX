@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle,
   Check,
@@ -7,6 +7,8 @@ import {
   FileJson,
   FileUp,
   Mail,
+  Maximize2,
+  Minimize2,
   Plus,
   Save,
   Send,
@@ -39,6 +41,26 @@ export function MailTemplatePage(): React.JSX.Element {
   const [opening, setOpening] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importedSource, setImportedSource] = useState<ImportedMailMessage | null>(null)
+  const [focusMode, setFocusMode] = useState(false)
+  const scrollTopBeforeFocus = useRef(0)
+  const focusModeWasActive = useRef(false)
+
+  useEffect(() => {
+    const mainContent = document.querySelector<HTMLElement>('.main-content')
+    if (focusMode) {
+      mainContent?.scrollTo?.({ top: 0 })
+      focusModeWasActive.current = true
+      const exitOnEscape = (event: KeyboardEvent): void => {
+        if (event.key === 'Escape') setFocusMode(false)
+      }
+      document.addEventListener('keydown', exitOnEscape)
+      return () => document.removeEventListener('keydown', exitOnEscape)
+    }
+    if (focusModeWasActive.current) {
+      mainContent?.scrollTo?.({ top: scrollTopBeforeFocus.current })
+      focusModeWasActive.current = false
+    }
+  }, [focusMode])
 
   const defaultsResult = useMemo(() => parseJsonObject(form.defaultsJson), [form.defaultsJson])
   const perSendResult = useMemo(() => parseJsonObject(perSendJson), [perSendJson])
@@ -58,6 +80,11 @@ export function MailTemplatePage(): React.JSX.Element {
   const savedTemplate = templates.find((template) => template.id === selectedId)
   const isDirty = !savedTemplate || JSON.stringify(toForm(savedTemplate)) !== JSON.stringify(form)
   const canOpen = allIssues.length === 0 && !opening
+
+  const enterFocusMode = (): void => {
+    scrollTopBeforeFocus.current = document.querySelector<HTMLElement>('.main-content')?.scrollTop ?? 0
+    setFocusMode(true)
+  }
 
   const persist = (next: MailTemplate[]): void => {
     setTemplates(next)
@@ -183,7 +210,7 @@ export function MailTemplatePage(): React.JSX.Element {
   }
 
   return (
-    <div className="page mail-template-page">
+    <div className={`page mail-template-page${focusMode ? ' is-focus-mode' : ''}`}>
       <PageHeader
         eyebrow="MAIL TEMPLATES"
         title="邮件模板"
@@ -213,25 +240,37 @@ export function MailTemplatePage(): React.JSX.Element {
         </aside>
 
         <section className="template-editor" aria-label="模板编辑">
-          <div className="workspace-heading"><span>模板内容</span>{isDirty && <small className="unsaved-dot">未保存</small>}</div>
+          <div className="workspace-heading">
+            <span>模板内容</span>
+            <div className="workspace-heading-actions">
+              {isDirty && <small className="unsaved-dot">未保存</small>}
+              <FocusModeButton active={focusMode} enter={enterFocusMode} exit={() => setFocusMode(false)} />
+            </div>
+          </div>
           {importedSource && <div className="import-summary"><FileUp size={16} /><div><strong>已导入 {importedSource.format.toUpperCase()}</strong><span>{importedSource.sourceName}</span><small>请把每次变化的内容改成 {'{{变量名}}'}，再点击保存模板。</small>{importedSource.warnings.map((warning) => <em key={warning}>{warning}</em>)}</div></div>}
           <div className="editor-scroll">
-            <Field label="模板名称"><input aria-label="模板名称" value={form.name} onChange={(event) => updateForm(setForm, 'name', event.target.value)} /></Field>
-            <Field label="收件人 To" hint="多个邮箱用逗号、分号或换行分隔"><textarea aria-label="收件人 To" rows={2} value={form.to} onChange={(event) => updateForm(setForm, 'to', event.target.value)} /></Field>
-            <div className="compact-field-grid">
-              <Field label="抄送 CC"><textarea aria-label="抄送 CC" rows={2} value={form.cc} onChange={(event) => updateForm(setForm, 'cc', event.target.value)} /></Field>
-              <Field label="密送 BCC"><textarea aria-label="密送 BCC" rows={2} value={form.bcc} onChange={(event) => updateForm(setForm, 'bcc', event.target.value)} /></Field>
+            <div className="mail-editor-secondary">
+              <Field label="模板名称"><input aria-label="模板名称" value={form.name} onChange={(event) => updateForm(setForm, 'name', event.target.value)} /></Field>
+              <Field label="收件人 To" hint="多个邮箱用逗号、分号或换行分隔"><textarea aria-label="收件人 To" rows={2} value={form.to} onChange={(event) => updateForm(setForm, 'to', event.target.value)} /></Field>
+              <div className="compact-field-grid">
+                <Field label="抄送 CC"><textarea aria-label="抄送 CC" rows={2} value={form.cc} onChange={(event) => updateForm(setForm, 'cc', event.target.value)} /></Field>
+                <Field label="密送 BCC"><textarea aria-label="密送 BCC" rows={2} value={form.bcc} onChange={(event) => updateForm(setForm, 'bcc', event.target.value)} /></Field>
+              </div>
+              <Field label="邮件标题"><input aria-label="邮件标题" value={form.subject} onChange={(event) => updateForm(setForm, 'subject', event.target.value)} /></Field>
             </div>
-            <Field label="邮件标题"><input aria-label="邮件标题" value={form.subject} onChange={(event) => updateForm(setForm, 'subject', event.target.value)} /></Field>
-            <Field label="邮件正文" hint="支持从 Excel 直接粘贴表格；用 {{变量名}} 标记每次需要替换的内容">
-              <RichMailEditor
-                value={form.bodyHtml}
-                onChange={(value) => updateForm(setForm, 'bodyHtml', value)}
-                onNotice={(text, kind = 'success') => setNotice({ kind, text })}
-              />
-            </Field>
-            <Field label="默认 JSON" hint="本次没有填写的变量会使用这里的默认值"><textarea aria-label="默认 JSON" className={`json-editor ${defaultsResult.ok ? '' : 'invalid'}`} rows={9} spellCheck={false} value={form.defaultsJson} onChange={(event) => updateForm(setForm, 'defaultsJson', event.target.value)} /></Field>
-            {!defaultsResult.ok && <InlineError text={defaultsResult.error} />}
+            <div className="mail-body-focus">
+              <Field label="邮件正文" hint="支持从 Excel 直接粘贴表格；用 {{变量名}} 标记每次需要替换的内容">
+                <RichMailEditor
+                  value={form.bodyHtml}
+                  onChange={(value) => updateForm(setForm, 'bodyHtml', value)}
+                  onNotice={(text, kind = 'success') => setNotice({ kind, text })}
+                />
+              </Field>
+            </div>
+            <div className="mail-editor-secondary">
+              <Field label="默认 JSON" hint="本次没有填写的变量会使用这里的默认值"><textarea aria-label="默认 JSON" className={`json-editor ${defaultsResult.ok ? '' : 'invalid'}`} rows={9} spellCheck={false} value={form.defaultsJson} onChange={(event) => updateForm(setForm, 'defaultsJson', event.target.value)} /></Field>
+              {!defaultsResult.ok && <InlineError text={defaultsResult.error} />}
+            </div>
           </div>
           <div className="editor-actions">
             <button className="button primary" onClick={saveTemplate}><Save size={14} />保存模板</button>
@@ -241,17 +280,27 @@ export function MailTemplatePage(): React.JSX.Element {
         </section>
 
         <section className="reuse-panel" aria-label="邮件复用与预览">
-          <div className="workspace-heading"><span>本次邮件</span><small>JSON 可只填变化内容</small></div>
+          <div className="workspace-heading">
+            <span>本次邮件</span>
+            <div className="workspace-heading-actions">
+              <small>JSON 可只填变化内容</small>
+              <FocusModeButton active={focusMode} enter={enterFocusMode} exit={() => setFocusMode(false)} />
+            </div>
+          </div>
           <div className="reuse-content">
-            <Field label="本次 JSON" hint="留空或填写 {} 时全部使用默认值"><textarea aria-label="本次 JSON" className={`json-editor per-send-editor ${perSendResult.ok ? '' : 'invalid'}`} rows={8} spellCheck={false} value={perSendJson} onChange={(event) => setPerSendJson(event.target.value)} /></Field>
-            {!perSendResult.ok && <InlineError text={perSendResult.error} />}
+            <div className="mail-reuse-secondary">
+              <Field label="本次 JSON" hint="留空或填写 {} 时全部使用默认值"><textarea aria-label="本次 JSON" className={`json-editor per-send-editor ${perSendResult.ok ? '' : 'invalid'}`} rows={8} spellCheck={false} value={perSendJson} onChange={(event) => setPerSendJson(event.target.value)} /></Field>
+              {!perSendResult.ok && <InlineError text={perSendResult.error} />}
+            </div>
 
             <div className="preview-card">
               <div className="preview-title"><span>最终邮件预览</span><small className={allIssues.length === 0 ? 'ready' : 'blocked'}>{allIssues.length === 0 ? '可以打开' : `${allIssues.length} 个问题`}</small></div>
-              <PreviewRecipients label="收件人" values={rendered.draft.to} />
-              {rendered.draft.cc.length > 0 && <PreviewRecipients label="抄送" values={rendered.draft.cc} />}
-              {rendered.draft.bcc.length > 0 && <PreviewRecipients label="密送" values={rendered.draft.bcc} />}
-              <div className="preview-subject"><span>标题</span><strong>{highlightPlaceholders(rendered.draft.subject) || '（空）'}</strong></div>
+              <div className="preview-context">
+                <PreviewRecipients label="收件人" values={rendered.draft.to} />
+                {rendered.draft.cc.length > 0 && <PreviewRecipients label="抄送" values={rendered.draft.cc} />}
+                {rendered.draft.bcc.length > 0 && <PreviewRecipients label="密送" values={rendered.draft.bcc} />}
+                <div className="preview-subject"><span>标题</span><strong>{highlightPlaceholders(rendered.draft.subject) || '（空）'}</strong></div>
+              </div>
               {rendered.draft.bodyText
                 ? <div className="preview-body rich-preview" dangerouslySetInnerHTML={{ __html: highlightMissingVariables(rendered.draft.bodyHtml, rendered.missingVariables) }} />
                 : <div className="preview-body empty-preview">（正文为空）</div>}
@@ -267,6 +316,12 @@ export function MailTemplatePage(): React.JSX.Element {
       </div>
     </div>
   )
+}
+
+function FocusModeButton({ active, enter, exit }: { active: boolean; enter(): void; exit(): void }): React.JSX.Element {
+  return active
+    ? <button type="button" className="button compact workspace-focus-button" aria-label="退出专注模式" onClick={exit}><Minimize2 size={13} />退出专注</button>
+    : <button type="button" className="button compact workspace-focus-button" aria-label="展开正文工作区" onClick={enter}><Maximize2 size={13} />展开</button>
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }): React.JSX.Element {

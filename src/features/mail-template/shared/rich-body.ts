@@ -7,9 +7,11 @@ const ALLOWED_TAGS = [
   'table', 'colgroup', 'col', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'mark'
 ]
 
-const COLOR = /^(?:#[0-9a-f]{3,8}|rgba?\(\s*\d{1,3}(?:\s*,\s*\d{1,3}){2}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)|[a-z]{1,24})$/i
+const COLOR_VALUE = '(?:#[0-9a-f]{3,8}|rgba?\\(\\s*\\d{1,3}(?:\\s*,\\s*\\d{1,3}){2}(?:\\s*,\\s*(?:0|1|0?\\.\\d+))?\\s*\\)|[a-z]{1,24})'
+const COLOR = new RegExp(`^${COLOR_VALUE}$`, 'i')
 const LENGTH = /^(?:0|(?:\d+(?:\.\d+)?|\.\d+)(?:px|pt|em|rem|%))$/i
-const BORDER = /^(?:none|0|(?:(?:\d+(?:\.\d+)?|\.\d+)(?:px|pt)\s+)?(?:solid|dashed|dotted|double)\s+(?:#[0-9a-f]{3,8}|[a-z]{1,24}))$/i
+const BORDER = new RegExp(`^(?:none|0|(?:(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?:px|pt)\\s+)?(?:solid|dashed|dotted|double)\\s+${COLOR_VALUE})$`, 'i')
+const BORDER_COLORS = new RegExp(`^${COLOR_VALUE}(?:\\s+${COLOR_VALUE}){0,3}$`, 'i')
 const FONT_FAMILY = /^[^;{}()<>]{1,120}$/u
 
 const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
@@ -48,7 +50,7 @@ const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
       'border-right': [BORDER],
       'border-bottom': [BORDER],
       'border-left': [BORDER],
-      'border-color': [COLOR],
+      'border-color': [BORDER_COLORS],
       'border-width': [/^(?:0|\d+(?:\.\d+)?(?:px|pt))(?:\s+(?:0|\d+(?:\.\d+)?(?:px|pt))){0,3}$/i],
       'border-style': [/^(?:none|solid|dashed|dotted|double)(?:\s+(?:none|solid|dashed|dotted|double)){0,3}$/i],
       'border-collapse': [/^(?:collapse|separate)$/i],

@@ -71,11 +71,17 @@ export function RichMailEditor({ value, onChange, onNotice }: RichMailEditorProp
     const table = normalizeClipboardTable({ html, text })
     if (table) {
       event.preventDefault()
+      if (table.kind === 'rejected') {
+        onNotice(table.message, 'error')
+        return
+      }
       if (!editor.chain().focus().insertContent(table.html).run()) {
         onNotice('表格无法插入当前位置，正文未被修改。', 'error')
         return
       }
-      onNotice(table.mode === 'tabular-text' ? '剪贴板没有可用的 Excel HTML，已按基础表格粘贴。' : 'Excel 表格已按安全邮件格式粘贴。')
+      onNotice(table.mode === 'tabular-text'
+        ? '剪贴板没有 Excel 富文本表格，已按基础表格粘贴；合并单元格和原样式无法保留。'
+        : 'Excel 表格已按安全邮件格式粘贴。')
       return
     }
     if (html) {

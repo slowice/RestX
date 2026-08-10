@@ -142,4 +142,34 @@ describe('mail template reuse page', () => {
     expect(screen.getByText('Excel 表格已按安全邮件格式粘贴。')).toBeInTheDocument()
     expect(screen.getByLabelText('邮件正文').querySelectorAll('table').length).toBeGreaterThanOrEqual(2)
   })
+
+  it('enters and exits focus mode without losing rich body edits', () => {
+    const { container } = render(<MailTemplatePage />)
+    pasteBody('<table><tr><td>专注模式表格</td><td>保留内容</td></tr></table>', '专注模式表格\t保留内容')
+
+    fireEvent.click(screen.getAllByRole('button', { name: '展开正文工作区' })[0])
+    expect(container.querySelector('.mail-template-page')).toHaveClass('is-focus-mode')
+    expect(screen.getAllByRole('button', { name: '退出专注模式' })).toHaveLength(2)
+    expect(screen.getByLabelText('邮件正文')).toHaveTextContent('专注模式表格')
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(container.querySelector('.mail-template-page')).not.toHaveClass('is-focus-mode')
+    expect(screen.getByLabelText('邮件正文')).toHaveTextContent('专注模式表格')
+  })
+
+  it('preserves Excel borders and merged cells through the editor and preview', async () => {
+    render(<MailTemplatePage />)
+    const html = '<html><head><style>td.xl65{border:.5pt solid windowtext;background:#fff2cc;text-align:center}td.xl66{border-top:1pt double #ff0000;border-right:.5pt solid windowtext;border-bottom:.5pt solid windowtext;border-left:.5pt solid windowtext}</style></head><body><table style="border-collapse:collapse"><tr><td class="xl65" colspan="2" rowspan="2">合并区域</td><td class="xl66">C1</td></tr><tr><td class="xl66">C2</td></tr></table></body></html>'
+    pasteBody(html, '合并区域\t\tC1\n\t\tC2')
+
+    const editorMerged = screen.getByLabelText('邮件正文').querySelector('td[colspan="2"][rowspan="2"]') as HTMLTableCellElement | null
+    expect(editorMerged).toBeInTheDocument()
+    expect(editorMerged?.style.border).toMatch(/0\.5pt solid/)
+
+    await waitFor(() => {
+      const previewMerged = document.querySelector('.preview-body td[colspan="2"][rowspan="2"]') as HTMLTableCellElement | null
+      expect(previewMerged).toBeInTheDocument()
+      expect(previewMerged?.style.border).toMatch(/0\.5pt solid/)
+    })
+  })
 })

@@ -13,6 +13,8 @@
 .workspace-heading > span { color: #222; font-size: 11px; font-weight: 700; }
 .workspace-heading small { color: #888; font-size: 9px; }
 .workspace-heading .unsaved-dot { color: #9a6200; }
+.workspace-heading-actions { display: flex; min-width: 0; align-items: center; gap: 7px; }
+.workspace-focus-button { height: 28px !important; padding: 0 8px !important; font-size: 9px !important; }
 
 .template-list { display: flex; flex: 1; flex-direction: column; gap: 6px; padding: 9px; overflow-y: auto; }
 .template-card { display: grid; grid-template-columns: 27px minmax(0, 1fr); align-items: center; gap: 8px; width: 100%; padding: 10px; color: #555; border: 1px solid transparent; border-radius: 9px; background: transparent; text-align: left; cursor: pointer; }
@@ -100,6 +102,31 @@
 .handoff-actions span { color: #888; font-size: 8px; }
 .handoff-buttons { display: flex; align-items: center; gap: 7px; }
 
+.mail-template-page.is-focus-mode { display: flex; width: calc(100% - 28px); height: 100vh; padding: 14px 0; overflow: hidden; flex-direction: column; }
+.mail-template-page.is-focus-mode .page-header { display: none; }
+.mail-template-page.is-focus-mode .mail-notice { flex: none; }
+.mail-template-page.is-focus-mode .mail-template-workspace { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); flex: 1; min-height: 0; }
+.mail-template-page.is-focus-mode .template-library,
+.mail-template-page.is-focus-mode .mail-editor-secondary,
+.mail-template-page.is-focus-mode .mail-reuse-secondary,
+.mail-template-page.is-focus-mode .preview-context,
+.mail-template-page.is-focus-mode .import-summary { display: none; }
+.mail-template-page.is-focus-mode .template-editor { min-height: 0; border-right: 1px solid #e5e5e5; }
+.mail-template-page.is-focus-mode .reuse-panel { min-height: 0; }
+.mail-template-page.is-focus-mode .editor-scroll,
+.mail-template-page.is-focus-mode .reuse-content { display: flex; min-height: 0; padding: 12px; overflow: hidden; flex-direction: column; }
+.mail-template-page.is-focus-mode .mail-body-focus,
+.mail-template-page.is-focus-mode .mail-body-focus > .mail-field { display: flex; flex: 1; min-height: 0; flex-direction: column; }
+.mail-template-page.is-focus-mode .mail-body-focus > .mail-field { margin-bottom: 0; }
+.mail-template-page.is-focus-mode .rich-mail-editor { display: flex; flex: 1; min-height: 0; flex-direction: column; }
+.mail-template-page.is-focus-mode .rich-mail-editor > div:last-child { display: flex; flex: 1; min-height: 0; }
+.mail-template-page.is-focus-mode .rich-mail-content { flex: 1; min-height: 0; max-height: none; }
+.mail-template-page.is-focus-mode .rich-mail-content table,
+.mail-template-page.is-focus-mode .rich-preview table { max-width: none; }
+.mail-template-page.is-focus-mode .preview-card { display: flex; flex: 1; min-height: 0; margin-top: 0; flex-direction: column; }
+.mail-template-page.is-focus-mode .preview-body { flex: 1; min-height: 0; max-height: none; }
+.mail-template-page.is-focus-mode .issue-list { flex: none; }
+
 @media (max-width: 1180px) {
   .mail-template-workspace { grid-template-columns: 190px minmax(310px, .9fr) minmax(340px, 1.1fr); }
 }
@@ -108,4 +135,9 @@
   .mail-template-workspace { grid-template-columns: 190px minmax(0, 1fr); }
   .reuse-panel { grid-column: 1 / -1; min-height: 560px; border-top: 1px solid #e5e5e5; }
   .template-editor { border-right: 0; }
+  .mail-template-page.is-focus-mode { height: auto; min-height: 100vh; overflow: visible; }
+  .mail-template-page.is-focus-mode .mail-template-workspace { grid-template-columns: minmax(0, 1fr); flex: none; }
+  .mail-template-page.is-focus-mode .template-editor,
+  .mail-template-page.is-focus-mode .reuse-panel { min-height: calc(100vh - 28px); }
+  .mail-template-page.is-focus-mode .template-editor { border-right: 0; }
 }
