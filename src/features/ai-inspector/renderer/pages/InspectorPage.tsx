@@ -27,6 +27,7 @@ import { JsonlDetail } from '../components/JsonlDetail'
 import { SmartImportDialog } from '../components/SmartImportDialog'
 import { formatBytes, formatDate, formatFullDate, formatRelativeDate } from '../format'
 import { useInspectorState } from '../state/InspectorState'
+import { useFileReveal } from '../use-file-reveal'
 import '../ai-inspector.css'
 
 type Status = 'idle' | 'scanning' | 'complete' | 'error'
@@ -48,6 +49,7 @@ export function InspectorPage(): React.JSX.Element {
   const [detailStatus, setDetailStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [detailError, setDetailError] = useState('')
   const [showSmartImport, setShowSmartImport] = useState(false)
+  const fileReveal = useFileReveal()
 
   const chooseAndScan = async (): Promise<void> => {
     try {
@@ -185,19 +187,20 @@ export function InspectorPage(): React.JSX.Element {
           </div>
 
           {detailStatus === 'error' && <div className="detail-load-error"><AlertTriangle size={15} />{detailError}</div>}
+          {fileReveal.error && <div className="detail-load-error reveal-error"><AlertTriangle size={15} /><span>{fileReveal.error}</span><button type="button" onClick={fileReveal.clearError}>关闭</button></div>}
           <div className={`results-workspace ${selectedConfig || selectedJsonl ? 'with-detail' : ''}`}>
             <section className="result-list folder-browser">
               {selectedWorkspace ? (
-                <WorkspaceSessionBrowser folder={selectedWorkspace} selectedPath={selectedJsonl?.path ?? null} loading={detailStatus === 'loading'} onOpen={openCandidate} />
+                <WorkspaceSessionBrowser folder={selectedWorkspace} selectedPath={selectedJsonl?.path ?? null} loading={detailStatus === 'loading'} onOpen={openCandidate} onReveal={fileReveal.reveal} />
               ) : searchedFiles ? (
                 searchedFiles.length > 0
-                  ? searchedFiles.map((item) => <CandidateRow key={item.path} candidate={item} selected={selectedConfig?.path === item.path || selectedJsonl?.path === item.path} loading={detailStatus === 'loading'} onOpen={openCandidate} />)
+                  ? searchedFiles.map((item) => <CandidateRow key={item.path} candidate={item} selected={selectedConfig?.path === item.path || selectedJsonl?.path === item.path} loading={detailStatus === 'loading'} onOpen={openCandidate} onReveal={fileReveal.reveal} />)
                   : <div className="no-results">没有匹配的工具文件</div>
               ) : selectedFolder ? (
                 selectedFolder.children.length > 0
                   ? selectedFolder.children.map((folder) => <FolderRow key={folder.id} folder={folder} onOpen={() => selectWorkspace(folder.id)} />)
                   : selectedFolder.files.length > 0
-                    ? selectedFolder.files.map((item) => <CandidateRow key={item.path} candidate={item} selected={selectedConfig?.path === item.path || selectedJsonl?.path === item.path} loading={detailStatus === 'loading'} onOpen={openCandidate} />)
+                    ? selectedFolder.files.map((item) => <CandidateRow key={item.path} candidate={item} selected={selectedConfig?.path === item.path || selectedJsonl?.path === item.path} loading={detailStatus === 'loading'} onOpen={openCandidate} onReveal={fileReveal.reveal} />)
                   : <div className="no-results">该文件夹中没有文件</div>
               ) : selectedTool ? (
                 selectedTool.folders.length > 0
@@ -206,11 +209,11 @@ export function InspectorPage(): React.JSX.Element {
               ) : detectedTools.length > 0 ? (
                 detectedTools.map((tool) => <ToolFolderRow key={tool.id} tool={tool} onOpen={() => selectTool(tool.id)} />)
               ) : lastScan.candidates.length > 0 ? (
-                lastScan.candidates.map((item) => <CandidateRow key={item.path} candidate={item} selected={selectedConfig?.path === item.path || selectedJsonl?.path === item.path} loading={detailStatus === 'loading'} onOpen={openCandidate} />)
+                lastScan.candidates.map((item) => <CandidateRow key={item.path} candidate={item} selected={selectedConfig?.path === item.path || selectedJsonl?.path === item.path} loading={detailStatus === 'loading'} onOpen={openCandidate} onReveal={fileReveal.reveal} />)
               ) : <div className="no-results">没有检测到预置 AI 工具，也没有发现通用配置候选</div>}
             </section>
             {selectedConfig && <ConfigDetail document={selectedConfig} onClose={() => setSelectedConfig(null)} />}
-            {selectedJsonl && <JsonlDetail candidate={selectedJsonl} initialQuery={selectedJsonlQuery || undefined} onClose={() => setSelectedJsonl(null)} />}
+            {selectedJsonl && <JsonlDetail candidate={selectedJsonl} initialQuery={selectedJsonlQuery || undefined} onClose={() => setSelectedJsonl(null)} onReveal={fileReveal.reveal} />}
           </div>
           <div className="result-footnote"><ShieldCheck size={14} />会话扫描仅在本地读取文件头部有限记录用于 Workspace 与问题摘要分组；搜索内容不会落盘或发送给模型。 · 扫描于 {formatDate(lastScan.completedAt)}</div>
         </>
@@ -304,11 +307,12 @@ function FolderBase({ name, description, count, onOpen }: { name: string; descri
   )
 }
 
-function WorkspaceSessionBrowser({ folder, selectedPath, loading, onOpen }: {
+function WorkspaceSessionBrowser({ folder, selectedPath, loading, onOpen, onReveal }: {
   folder: ToolFolderNode
   selectedPath: string | null
   loading: boolean
   onOpen: (candidate: ScanCandidate, initialQuery?: string) => Promise<void>
+  onReveal: (path: string) => Promise<void>
 }): React.JSX.Element {
   const [query, setQuery] = useState('')
   const [result, setResult] = useState<JsonlWorkspaceSearchResult | null>(null)
@@ -364,22 +368,23 @@ function WorkspaceSessionBrowser({ folder, selectedPath, loading, onOpen }: {
           result.hits.length > 0
             ? result.hits.map((hit) => {
               const candidate = candidatesByPath.get(hit.file.path)
-              return candidate ? <WorkspaceSearchResultRow key={`${hit.file.path}:${hit.entry.offset}`} hit={hit} candidate={candidate} selected={selectedPath === candidate.path} onOpen={() => onOpen(candidate, result.query)} /> : null
+              return candidate ? <WorkspaceSearchResultRow key={`${hit.file.path}:${hit.entry.offset}`} hit={hit} candidate={candidate} selected={selectedPath === candidate.path} onOpen={() => onOpen(candidate, result.query)} onReveal={() => onReveal(candidate.path)} /> : null
             })
             : <div className="no-results">该 Workspace 的会话中没有匹配记录</div>
         ) : status !== 'searching' ? (
-          folder.files.map((candidate) => <SessionRow key={candidate.path} candidate={candidate} selected={selectedPath === candidate.path} loading={loading} onOpen={() => onOpen(candidate)} />)
+          folder.files.map((candidate) => <SessionRow key={candidate.path} candidate={candidate} selected={selectedPath === candidate.path} loading={loading} onOpen={() => onOpen(candidate)} onReveal={() => onReveal(candidate.path)} />)
         ) : null}
       </div>
     </div>
   )
 }
 
-function SessionRow({ candidate, selected, loading, onOpen }: {
+function SessionRow({ candidate, selected, loading, onOpen, onReveal }: {
   candidate: ScanCandidate
   selected: boolean
   loading: boolean
   onOpen: () => Promise<void>
+  onReveal: () => Promise<void>
 }): React.JSX.Element {
   const occurredAt = candidate.session?.startedAt ?? candidate.modifiedAt
   return (
@@ -392,17 +397,18 @@ function SessionRow({ candidate, selected, loading, onOpen }: {
       <div className="session-row-time"><time>{formatFullDate(occurredAt)}</time><small>{formatRelativeDate(occurredAt)}</small></div>
       <div className="session-row-actions">
         <button className="button compact view-config" disabled={loading} onClick={() => void onOpen()}><MessageSquareText size={13} />浏览会话</button>
-        <button className="button compact" onClick={() => void window.restx.inspector.revealInFolder(candidate.path)}><FolderOpen size={13} />定位</button>
+        <button className="button compact" onClick={() => void onReveal()}><FolderOpen size={13} />打开文件位置</button>
       </div>
     </article>
   )
 }
 
-function WorkspaceSearchResultRow({ hit, candidate, selected, onOpen }: {
+function WorkspaceSearchResultRow({ hit, candidate, selected, onOpen, onReveal }: {
   hit: JsonlWorkspaceSearchHit
   candidate: ScanCandidate
   selected: boolean
   onOpen: () => Promise<void>
+  onReveal: () => Promise<void>
 }): React.JSX.Element {
   const occurredAt = hit.entry.timestamp ?? hit.file.modifiedAt
   return (
@@ -413,7 +419,7 @@ function WorkspaceSearchResultRow({ hit, candidate, selected, onOpen }: {
         <span><b>{candidate.session?.title ?? candidate.session?.sessionId ?? candidate.name}</b><small>{hit.entry.tags.map((tag) => tag.label).join(' · ')}</small></span>
       </div>
       <div className="session-row-time"><time>{formatFullDate(occurredAt)}</time><small>{formatRelativeDate(occurredAt)}</small></div>
-      <div className="session-row-actions"><button className="button compact view-config" onClick={() => void onOpen()}><MessageSquareText size={13} />查看所在会话</button></div>
+      <div className="session-row-actions"><button className="button compact view-config" onClick={() => void onOpen()}><MessageSquareText size={13} />查看所在会话</button><button className="button compact" onClick={() => void onReveal()}><FolderOpen size={13} />打开文件位置</button></div>
     </article>
   )
 }
@@ -442,7 +448,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
   return <section className="state-card error"><AlertTriangle size={34} /><h2>无法完成扫描</h2><p>{message}</p><button className="button secondary" onClick={onRetry}><RotateCw size={15} />重试</button></section>
 }
 
-function CandidateRow({ candidate, selected, loading, onOpen }: { candidate: ScanCandidate; selected: boolean; loading: boolean; onOpen: (candidate: ScanCandidate) => Promise<void> }): React.JSX.Element {
+function CandidateRow({ candidate, selected, loading, onOpen, onReveal }: { candidate: ScanCandidate; selected: boolean; loading: boolean; onOpen: (candidate: ScanCandidate) => Promise<void>; onReveal: (path: string) => Promise<void> }): React.JSX.Element {
   const [copied, setCopied] = useState(false)
   const Icon = candidate.kind === 'config' ? FileCog : candidate.kind === 'instruction' ? FileCode2 : candidate.kind === 'conversation' ? MessageSquareText : candidate.kind === 'history' ? History : FileText
   const copy = async (): Promise<void> => {
@@ -459,7 +465,7 @@ function CandidateRow({ candidate, selected, loading, onOpen }: { candidate: Sca
       <button className="icon-button" onClick={() => void copy()} title="复制路径">{copied ? <Check size={16} /> : <Clipboard size={16} />}</button>
       <div className="candidate-actions">
         {candidate.viewer !== 'metadata' && <button className="button compact view-config" disabled={loading} onClick={() => void onOpen(candidate)}>{loading && !selected ? <LoaderCircle className="spin" size={13} /> : candidate.viewer === 'jsonl' ? <MessageSquareText size={13} /> : <FileCog size={13} />}{candidate.viewer === 'jsonl' ? '浏览记录' : '查看'}</button>}
-        <button className="button compact" onClick={() => void window.restx.inspector.revealInFolder(candidate.path)}><FolderOpen size={14} />定位</button>
+        <button className="button compact" onClick={() => void onReveal(candidate.path)}><FolderOpen size={14} />打开文件位置</button>
       </div>
     </article>
   )

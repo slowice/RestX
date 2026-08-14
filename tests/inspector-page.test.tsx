@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { RestXApi } from '../src/app-api'
 import type { CachedAnalysisResponse } from '../src/features/ai-inspector/shared/contracts/ai-capability'
@@ -180,6 +180,8 @@ describe('Inspector tool folder browser', () => {
     fireEvent.click(screen.getByRole('button', { name: /work.*1 项/ }))
     expect(screen.getByText('排查模型调用错误')).toBeInTheDocument()
     expect(screen.getByText(/2026.*07.*21.*:00:00/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '打开文件位置' }))
+    await waitFor(() => expect(api.inspector.revealInFolder).toHaveBeenCalledWith(jsonlCandidate.path))
 
     fireEvent.change(screen.getByPlaceholderText('搜索这个 Workspace 中的问题、错误或模型输出…'), { target: { value: '不可解析' } })
     fireEvent.click(screen.getByRole('button', { name: '搜索全部会话' }))
@@ -188,12 +190,33 @@ describe('Inspector tool folder browser', () => {
       query: '不可解析', files: [{ path: jsonlCandidate.path, profileId: 'codex-events-v1' }]
     })
     expect(screen.getByText(/已扫描 1\/1 个会话、860 条记录/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '打开文件位置' }))
+    await waitFor(() => expect(api.inspector.revealInFolder).toHaveBeenCalledTimes(2))
 
     fireEvent.click(screen.getByRole('button', { name: '查看所在会话' }))
     await waitFor(() => expect(api.inspector.readJsonlPage).toHaveBeenLastCalledWith(expect.objectContaining({ query: '不可解析' })))
+    fireEvent.click(within(screen.getByRole('complementary')).getByRole('button', { name: '打开文件位置' }))
+    await waitFor(() => expect(api.inspector.revealInFolder).toHaveBeenCalledTimes(3))
     fireEvent.click(screen.getByRole('button', { name: /用户.*模型返回不可解析错误/ }))
     await waitFor(() => expect(api.inspector.readJsonlEntry).toHaveBeenCalled())
     expect(screen.getByText(/"type": "reasoning"/)).toBeInTheDocument()
+  })
+
+  it('keeps scanned history visible when revealing its source fails', async () => {
+    const api = makeApi()
+    api.inspector.revealInFolder = vi.fn(async () => { throw new Error('文件不存在或已被移动，请重新扫描后再试。') })
+    Object.defineProperty(window, 'restx', { configurable: true, value: api })
+    render(<MemoryRouter><InspectorStateProvider><InspectorPage /></InspectorStateProvider></MemoryRouter>)
+
+    fireEvent.click(screen.getAllByRole('button', { name: /选择用户目录/ })[0])
+    await waitFor(() => expect(screen.getByRole('button', { name: /配置.*模型、服务和权限等配置/ })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /配置.*模型、服务和权限等配置/ }))
+    fireEvent.click(screen.getByRole('button', { name: '打开文件位置' }))
+
+    await waitFor(() => expect(screen.getByText('文件不存在或已被移动，请重新扫描后再试。')).toBeInTheDocument())
+    expect(screen.getByText('config.toml')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }))
+    expect(screen.queryByText('文件不存在或已被移动，请重新扫描后再试。')).not.toBeInTheDocument()
   })
 
   it('generates, previews, and confirms a smart imported preset', async () => {

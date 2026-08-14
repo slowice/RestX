@@ -1,4 +1,5 @@
 import { dialog, shell } from 'electron'
+import { lstat } from 'node:fs/promises'
 import path from 'node:path'
 import type { AnalyzeConfigInput } from '../shared/contracts/ai-capability'
 import type { JsonlEntryRequest, JsonlPageRequest, JsonlWorkspaceSearchRequest } from '../shared/contracts/jsonl'
@@ -14,6 +15,7 @@ import { readConfigDocument } from './services/config-reader'
 import { analyzeWithOpenAiCompatible } from './services/openai-provider'
 import { preferences } from './services/preferences'
 import { scanDirectory } from './services/file-scanner'
+import { revealAuthorizedFile } from './services/file-reveal'
 import { readJsonlEntry, readJsonlPage, searchJsonlWorkspace } from './services/jsonl-browser'
 import { generateSmartPresetDraft } from './services/smart-preset-import'
 import { refreshAiToolPresetRegistry, userPresetStore } from './services/user-preset-store'
@@ -144,8 +146,11 @@ export const aiInspectorMainFeature = defineMainFeature({
 
   ipc.handle(aiInspectorChannels.revealInFolder, async (_event, filePath: unknown) => {
     assertString(filePath, 'filePath')
-    await authorizedPaths.assertAuthorized(filePath)
-    shell.showItemInFolder(path.resolve(filePath))
+    await revealAuthorizedFile(path.resolve(filePath), {
+      assertAuthorized: (candidate) => authorizedPaths.assertAuthorized(candidate),
+      lstat,
+      showItemInFolder: (candidate) => shell.showItemInFolder(candidate)
+    })
   })
 
   ipc.handle(aiInspectorChannels.getPreferences, () => preferences.get())

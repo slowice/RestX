@@ -7,7 +7,7 @@ import type { ScanCandidate } from '../../shared/contracts/inspector'
 import type { JsonlEntryDetail, JsonlEventSummary, JsonlPage } from '../../shared/contracts/jsonl'
 import { formatBytes, formatDate, formatFullDate, formatRelativeDate } from '../format'
 
-export function JsonlDetail({ candidate, initialQuery, onClose }: { candidate: ScanCandidate; initialQuery?: string; onClose: () => void }): React.JSX.Element {
+export function JsonlDetail({ candidate, initialQuery, onClose, onReveal }: { candidate: ScanCandidate; initialQuery?: string; onClose: () => void; onReveal: (path: string) => Promise<void> }): React.JSX.Element {
   const [page, setPage] = useState<JsonlPage | null>(null)
   const [entries, setEntries] = useState<JsonlEventSummary[]>([])
   const [selected, setSelected] = useState<JsonlEntryDetail | null>(null)
@@ -143,6 +143,7 @@ export function JsonlDetail({ candidate, initialQuery, onClose }: { candidate: S
       <header className="detail-header">
         <div className="detail-file-icon"><FileJson2 size={18} /></div>
         <div><strong>{candidate.name}</strong><span title={candidate.path}>{candidate.path}</span></div>
+        <button className="button compact reveal-file" onClick={() => void onReveal(candidate.path)}><FolderOpen size={14} />打开文件位置</button>
         <button className="icon-button" title="关闭" onClick={onClose}><X size={16} /></button>
       </header>
       <div className="detail-meta">
