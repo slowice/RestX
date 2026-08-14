@@ -42,7 +42,7 @@ function resolveHint(rootPath: string, hint: string): string | null {
 }
 
 export async function collectPresetInventory(rootPath: string, toolName: string, knownPaths: string): Promise<PresetInventory> {
-  const entries: PresetInventoryEntry[] = []
+  const entries: PresetInventoryEntry[] = [{ path: '.', type: 'directory' }]
   const visited = new Set<string>()
   const tokens = toolTokens(toolName)
   const queue: Array<{ directory: string; depth: number }> = [{ directory: rootPath, depth: 0 }]

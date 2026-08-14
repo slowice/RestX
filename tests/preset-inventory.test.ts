@@ -18,6 +18,7 @@ describe('preset metadata inventory', () => {
     const inventory = await collectPresetInventory(root, 'Nova', '.nova')
     const serialized = JSON.stringify(inventory)
 
+    expect(inventory.entries[0]).toEqual({ path: '.', type: 'directory' })
     expect(inventory.entries.some((entry) => entry.path === '.nova/config.json')).toBe(true)
     expect(serialized).not.toContain('UNIQUE_SECRET_CONTENT')
     expect(serialized).not.toContain('private log body')

@@ -26,6 +26,36 @@ const modelDraft = {
 }
 
 describe('smart preset generation', () => {
+  it('supports using the selected tool data directory itself as the preset root', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'restx-smart-import-'))
+    temporaryDirectories.push(root)
+    await writeFile(path.join(root, 'config.json'), '{}')
+    const rootDraft = {
+      preset: {
+        id: 'codeagentcc', displayName: 'CodeAgentCC', version: 1,
+        probes: [{ relativePath: '.', entryType: 'directory' }],
+        sources: [{
+          id: 'codeagentcc-root', relativePath: '.', label: 'CodeAgentCC 数据目录', maxDepth: 1,
+          patterns: [{ glob: 'config.json', kind: 'config', viewer: 'config', label: 'CodeAgentCC 配置' }]
+        }]
+      },
+      explanation: '扫描根目录就是 CodeAgentCC 数据目录。',
+      warnings: []
+    }
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(rootDraft) } }] }), { status: 200 }))
+
+    const result = await generateSmartPresetDraft({ toolName: 'codeagentcc', rootPath: root, knownPaths: '', notes: '', metadataConsent: true }, {
+      settings: { baseUrl: 'https://example.com/v1', model: 'demo', apiKey: 'key' }, fetchImpl,
+      logger: { write: async () => undefined }
+    })
+
+    expect(result.trial.detected).toBe(true)
+    expect(result.trial.candidates.map((item) => item.name)).toEqual(['config.json'])
+    const requestBody = JSON.parse(String((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body))
+    const userPayload = JSON.parse(requestBody.messages[1].content)
+    expect(userPayload.inventory[0]).toEqual({ path: '.', type: 'directory' })
+  })
+
   it('uses a strict prompt, logs the call, validates output, and trial-scans it', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'restx-smart-import-'))
     temporaryDirectories.push(root)
