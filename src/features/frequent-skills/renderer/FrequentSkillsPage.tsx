@@ -59,6 +59,7 @@ export function FrequentSkillsPage(): React.JSX.Element {
   const [invalidCount, setInvalidCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [importing, setImporting] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [executingId, setExecutingId] = useState<string | null>(null)
   const [editor, setEditor] = useState<EditorState | null>(null)
@@ -115,15 +116,24 @@ export function FrequentSkillsPage(): React.JSX.Element {
 
   const importSkill = async (): Promise<void> => {
     setBusy(true)
+    setImporting(true)
     setNotice(null)
     try {
       const imported = unwrap(await window.restx.frequentSkills.importSkill())
       if (imported.cancelled) return
       await loadSkills()
-      setNotice({ kind: 'success', text: `Skill“${imported.skill?.name ?? ''}”已导入。` })
+      const skillName = imported.skill?.name ?? ''
+      const analysis = imported.analysis
+      const text = analysis?.method === 'direct'
+        ? `Skill“${skillName}”是标准 RestX Skill，已直接导入。`
+        : analysis?.method === 'ai'
+          ? `已智能识别${analysis.detectedFormat ? `为 ${analysis.detectedFormat}` : '文件结构'}并导入 Skill“${skillName}”。`
+          : `智能分析未完成，已保留原始内容导入 Skill“${skillName}”；如有需要可编辑名称和说明。`
+      setNotice({ kind: 'success', text })
     } catch (reason) {
       setNotice({ kind: 'error', text: errorMessage(reason) })
     } finally {
+      setImporting(false)
       setBusy(false)
     }
   }
@@ -174,7 +184,7 @@ export function FrequentSkillsPage(): React.JSX.Element {
         eyebrow="RESTX AI SKILLS"
         title="常用技能"
         description="把经常使用的提示词保存为本地 Skill，通过当前启用的 AI Provider 一键执行。"
-        actions={<div className="frequent-skills-header-actions"><button className="button" disabled={busy} onClick={() => void importSkill()}><FileUp size={15} />导入 Skill</button><button className="button primary" disabled={busy} onClick={openCreate}><Plus size={15} />新增 Skill</button></div>}
+        actions={<div className="frequent-skills-header-actions"><button className="button" disabled={busy} onClick={() => void importSkill()}>{importing ? <LoaderCircle className="spin" size={15} /> : <FileUp size={15} />}{importing ? '正在智能导入…' : '智能导入 Skill'}</button><button className="button primary" disabled={busy} onClick={openCreate}><Plus size={15} />新增 Skill</button></div>}
       />
 
       {notice && <div className={`frequent-skills-notice ${notice.kind}`} role={notice.kind === 'error' ? 'alert' : 'status'}>{notice.kind === 'success' ? <Check size={15} /> : <AlertCircle size={15} />}<span>{notice.text}</span></div>}
@@ -196,9 +206,9 @@ export function FrequentSkillsPage(): React.JSX.Element {
                 </div>
               </article>
             ))}
-            {!loading && skills.length === 0 && <div className="frequent-skills-empty"><WandSparkles size={27} /><strong>还没有常用技能</strong><span>新增一个固定提示词，或导入标准 RestX SKILL.md。</span><div><button className="button compact" onClick={() => void importSkill()}><FileUp size={13} />导入</button><button className="button compact primary" onClick={openCreate}><Plus size={13} />新增</button></div></div>}
+            {!loading && skills.length === 0 && <div className="frequent-skills-empty"><WandSparkles size={27} /><strong>还没有常用技能</strong><span>新增一个固定提示词，或智能导入已有 Markdown Skill。</span><div><button className="button compact" onClick={() => void importSkill()}><FileUp size={13} />智能导入</button><button className="button compact primary" onClick={openCreate}><Plus size={13} />新增</button></div></div>}
           </div>
-          <div className="frequent-skills-storage-note"><Clipboard size={14} /><span>Skills 保存在 ~/.restx/skills；执行结果不会保存。</span></div>
+          <div className="frequent-skills-storage-note"><Clipboard size={14} /><span>Skills 保存在 ~/.restx/skills；非 RestX 格式的源内容可能发送给当前 AI Provider，仅用于分析名称、说明和格式。</span></div>
         </section>
 
         <section className="frequent-skills-result" aria-label="最近执行结果">

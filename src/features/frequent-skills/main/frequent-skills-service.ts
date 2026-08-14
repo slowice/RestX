@@ -1,5 +1,4 @@
 import { lstat, readFile } from 'node:fs/promises'
-import path from 'node:path'
 import type { AiProviderExecutionContext } from '../../../platform/ai-provider/shared/contracts'
 import {
   MAX_SKILL_FILE_BYTES,
@@ -11,6 +10,8 @@ import {
 } from '../shared/contracts'
 import { FrequentSkillsError } from './services/frequent-skills-error'
 import { executeSkillPrompt } from './services/skill-executor'
+import { analyzeSkillImportMetadata } from './services/skill-import-analyzer'
+import { extractFallbackDraft, readMarkdownSource } from './services/skill-import-source'
 import { parseSkillMarkdown } from './services/skill-markdown'
 import { SkillStore } from './services/skill-store'
 
@@ -30,6 +31,7 @@ function isProviderConfigurationError(reason: unknown): boolean {
 
 export class FrequentSkillsService {
   private executing = false
+  private importing = false
   private readonly now: () => Date
 
   constructor(private readonly dependencies: FrequentSkillsServiceDependencies) {
@@ -58,21 +60,46 @@ export class FrequentSkillsService {
   }
 
   async importSkill(): Promise<FrequentSkillImportResult> {
-    const selected = await this.dependencies.chooseImportFile()
-    if (!selected) return { cancelled: true }
+    if (this.importing) throw new FrequentSkillsError('IMPORT_IN_PROGRESS', '已有 Skill 正在导入，请稍候。')
+    this.importing = true
     try {
-      if (path.basename(selected).toLowerCase() !== 'skill.md') {
-        throw new FrequentSkillsError('INVALID_SKILL_FILE', '请选择名为 SKILL.md 的 RestX Skill 文件。')
-      }
+      const selected = await this.dependencies.chooseImportFile()
+      if (!selected) return { cancelled: true }
       const stat = await lstat(selected)
       if (!stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_SKILL_FILE_BYTES) {
         throw new FrequentSkillsError('INVALID_SKILL_FILE', 'Skill 文件格式无效。')
       }
-      const source = parseSkillMarkdown(await readFile(selected, 'utf8'))
-      return { cancelled: false, skill: await this.dependencies.store.importSkill(source) }
+      const sourceText = readMarkdownSource(await readFile(selected), selected)
+      try {
+        const source = parseSkillMarkdown(sourceText)
+        return {
+          cancelled: false,
+          skill: await this.dependencies.store.importSkill(source),
+          analysis: { method: 'direct' }
+        }
+      } catch {
+        const fallback = extractFallbackDraft(sourceText, selected)
+        let metadata
+        try {
+          metadata = await this.dependencies.executeActive((context) => analyzeSkillImportMetadata(fallback.prompt, context))
+        } catch {
+          return {
+            cancelled: false,
+            skill: await this.dependencies.store.create(fallback),
+            analysis: { method: 'fallback', warning: '智能分析未完成，已使用文件中的本地信息导入。' }
+          }
+        }
+        return {
+          cancelled: false,
+          skill: await this.dependencies.store.create({ ...fallback, name: metadata.name, description: metadata.description }),
+          analysis: { method: 'ai', detectedFormat: metadata.detectedFormat }
+        }
+      }
     } catch (reason) {
       if (reason instanceof FrequentSkillsError) throw reason
       throw new FrequentSkillsError('INVALID_SKILL_FILE', '无法导入该 Skill 文件。')
+    } finally {
+      this.importing = false
     }
   }
 

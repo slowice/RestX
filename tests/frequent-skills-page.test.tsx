@@ -62,4 +62,18 @@ describe('FrequentSkillsPage', () => {
     await waitFor(() => expect(api.create).toHaveBeenCalledWith({ name: '新技能', description: '', prompt: '固定提示词' }))
     expect(await screen.findByText('Skill“新技能”已新增。')).toBeInTheDocument()
   })
+
+  it.each([
+    [{ method: 'direct' as const }, '是标准 RestX Skill，已直接导入'],
+    [{ method: 'ai' as const, detectedFormat: 'Codex Skill' }, '已智能识别为 Codex Skill'],
+    [{ method: 'fallback' as const, warning: 'safe warning' }, '智能分析未完成，已保留原始内容导入']
+  ])('shows distinct smart-import feedback for %o', async (analysis, expected) => {
+    const api = installApi()
+    vi.mocked(api.importSkill).mockImplementation(() => success({ cancelled: false, skill, analysis }))
+    render(<FrequentSkillsPage />)
+    await screen.findByText('整理会议纪要')
+    expect(screen.getByText(/非 RestX 格式的源内容可能发送给当前 AI Provider/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '智能导入 Skill' }))
+    expect(await screen.findByText(new RegExp(expected))).toBeInTheDocument()
+  })
 })

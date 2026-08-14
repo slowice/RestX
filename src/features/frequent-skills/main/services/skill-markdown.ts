@@ -24,20 +24,20 @@ function isExactIsoTimestamp(value: unknown): value is string {
   return !Number.isNaN(date.getTime()) && date.toISOString() === value
 }
 
-function validateText(value: unknown, maximum: number, required: boolean): string {
+function validateText(value: unknown, maximum: number, required: boolean, preserve = false): string {
   if (typeof value !== 'string') throw new FrequentSkillsError('INVALID_INPUT', 'Skill 字段类型无效。')
   const normalized = value.trim()
   if ((required && !normalized) || normalized.length > maximum) {
     throw new FrequentSkillsError('INVALID_INPUT', 'Skill 字段内容无效。')
   }
-  return normalized
+  return preserve ? value : normalized
 }
 
 export function normalizeSkillDraft(input: FrequentSkillDraft): FrequentSkillDraft {
   return {
     name: validateText(input.name, MAX_SKILL_NAME_CHARS, true),
     description: validateText(input.description, MAX_SKILL_DESCRIPTION_CHARS, false),
-    prompt: validateText(input.prompt, MAX_SKILL_PROMPT_CHARS, true)
+    prompt: validateText(input.prompt, MAX_SKILL_PROMPT_CHARS, true, true)
   }
 }
 
@@ -66,7 +66,7 @@ export function parseSkillMarkdown(content: string): FrequentSkill {
     const draft = normalizeSkillDraft({
       name: record.name as string,
       description: record.description as string,
-      prompt: content.slice(match[0].length).replace(/^\r?\n/, '')
+      prompt: content.slice(match[0].length).replace(/^\r?\n/, '').replace(/\r?\n$/, '')
     })
     return {
       schemaVersion: SKILL_SCHEMA_VERSION,

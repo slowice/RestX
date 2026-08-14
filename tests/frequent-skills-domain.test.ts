@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { parseSkillMarkdown, serializeSkillMarkdown } from '../src/features/frequent-skills/main/services/skill-markdown'
+import { extractFallbackDraft, normalizeImportedPrompt } from '../src/features/frequent-skills/main/services/skill-import-source'
+import { parseSkillImportMetadata } from '../src/features/frequent-skills/main/services/skill-import-analyzer'
 import { SkillStore } from '../src/features/frequent-skills/main/services/skill-store'
 import type { FrequentSkill } from '../src/features/frequent-skills/shared/contracts'
 
@@ -35,6 +37,26 @@ describe('RestX Skill Markdown', () => {
     expect(() => parseSkillMarkdown(markdown.replace('schemaVersion: 1', 'schemaVersion: 2'))).toThrow(/格式无效/)
     expect(() => parseSkillMarkdown(markdown.replace('updatedAt:', 'extra: true\nupdatedAt:'))).toThrow(/格式无效/)
     expect(() => parseSkillMarkdown(markdown.replace('请把今日工作整理成三点。', '   '))).toThrow(/格式无效/)
+  })
+
+  it('normalizes only line endings and surrounding blank lines for imported prompts', () => {
+    expect(normalizeImportedPrompt('\r\n  indented\r\nline with spaces  \r\n\r\n')).toBe('  indented\nline with spaces  ')
+    const preserved = { ...example, prompt: '  indented\nline with spaces  ' }
+    expect(parseSkillMarkdown(serializeSkillMarkdown(preserved)).prompt).toBe(preserved.prompt)
+  })
+
+  it('extracts fallback metadata in Frontmatter, H1, then filename order', () => {
+    expect(extractFallbackDraft('---\nname: Frontmatter\n---\n# Heading', '/tmp/file.md').name).toBe('Frontmatter')
+    expect(extractFallbackDraft('# Heading', '/tmp/file.md').name).toBe('Heading')
+    expect(extractFallbackDraft('Plain instructions', '/tmp/file.md').name).toBe('file')
+  })
+
+  it('accepts bounded AI metadata while ignoring executable and extra fields', () => {
+    expect(parseSkillImportMetadata(JSON.stringify({
+      name: 'Imported', description: 'Description', detectedFormat: 'Codex', prompt: 'replace it', other: true
+    }))).toEqual({ name: 'Imported', description: 'Description', detectedFormat: 'Codex' })
+    expect(() => parseSkillImportMetadata(JSON.stringify({ name: 'x'.repeat(81), description: '' }))).toThrow()
+    expect(() => parseSkillImportMetadata('not json')).toThrow()
   })
 })
 

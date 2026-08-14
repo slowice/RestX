@@ -4,6 +4,7 @@ export const MAX_SKILL_DESCRIPTION_CHARS = 300
 export const MAX_SKILL_PROMPT_CHARS = 64_000
 export const MAX_SKILL_FILE_BYTES = 128 * 1024
 export const MAX_SKILL_RESULT_CHARS = 200_000
+export const MAX_SKILL_FORMAT_CHARS = 80
 
 export type FrequentSkill = {
   schemaVersion: typeof SKILL_SCHEMA_VERSION
@@ -33,6 +34,13 @@ export type FrequentSkillList = {
 export type FrequentSkillImportResult = {
   cancelled: boolean
   skill?: FrequentSkill
+  analysis?: FrequentSkillImportAnalysis
+}
+
+export type FrequentSkillImportAnalysis = {
+  method: 'direct' | 'ai' | 'fallback'
+  detectedFormat?: string
+  warning?: string
 }
 
 export type FrequentSkillExecutionResult = {
@@ -48,6 +56,7 @@ export type FrequentSkillsErrorCode =
   | 'INVALID_SKILL_FILE'
   | 'PROVIDER_NOT_CONFIGURED'
   | 'EXECUTION_IN_PROGRESS'
+  | 'IMPORT_IN_PROGRESS'
   | 'EXECUTION_FAILED'
   | 'STORAGE_FAILED'
 
