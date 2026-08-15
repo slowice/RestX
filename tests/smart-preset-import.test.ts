@@ -36,7 +36,7 @@ describe('smart preset generation', () => {
         probes: [{ relativePath: '.', entryType: 'directory' }],
         sources: [{
           id: 'codeagentcc-root', relativePath: '.', label: 'CodeAgentCC 数据目录', maxDepth: 1,
-          patterns: [{ glob: 'config.json', kind: 'config', viewer: 'config', label: 'CodeAgentCC 配置' }]
+          patterns: [{ glob: 'config.json', kind: 'config', viewer: 'config' }]
         }]
       },
       explanation: '扫描根目录就是 CodeAgentCC 数据目录。',
@@ -51,6 +51,7 @@ describe('smart preset generation', () => {
 
     expect(result.trial.detected).toBe(true)
     expect(result.trial.candidates.map((item) => item.name)).toEqual(['config.json'])
+    expect(result.preset.sources[0].patterns[0].label).toBe('配置：config.json')
     const requestBody = JSON.parse(String((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body))
     const userPayload = JSON.parse(requestBody.messages[1].content)
     expect(userPayload.inventory[0]).toEqual({ path: '.', type: 'directory' })
