@@ -275,6 +275,7 @@ export function MailTemplatePage(): React.JSX.Element {
                   autoScale={scaleMode === 'auto'}
                   layoutKey={workspaceMode}
                   onScaleChange={setEditorScale}
+                  onRequestActualSize={() => setScaleMode('actual')}
                 />
               </Field>
             </div>

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import TextAlign from '@tiptap/extension-text-align'
@@ -15,6 +15,14 @@ type RichMailEditorProps = {
   autoScale: boolean
   layoutKey: string
   onScaleChange(scale: number): void
+  onRequestActualSize(): void
+}
+
+type PendingEditorPointer = {
+  localX: number
+  localY: number
+  viewportX: number
+  viewportY: number
 }
 
 const StyledTable = Table.extend({
@@ -41,7 +49,10 @@ const StyledTableHeader = TableHeader.extend({
   }
 })
 
-export function RichMailEditor({ value, onChange, onNotice, autoScale, layoutKey, onScaleChange }: RichMailEditorProps): React.JSX.Element {
+export function RichMailEditor({ value, onChange, onNotice, autoScale, layoutKey, onScaleChange, onRequestActualSize }: RichMailEditorProps): React.JSX.Element {
+  const pendingPointer = useRef<PendingEditorPointer | null>(null)
+  const suppressPointerSequence = useRef(false)
+  const pointerReleaseTimer = useRef(0)
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -60,7 +71,7 @@ export function RichMailEditor({ value, onChange, onNotice, autoScale, layoutKey
     editorProps: { attributes: { class: 'rich-mail-content', 'aria-label': '邮件正文' } },
     onUpdate: ({ editor }) => onChange(sanitizeMailHtml(editor.getHTML()).html)
   })
-  const { viewportRef, contentRef, scale } = useAdaptiveMailScale(autoScale, `${layoutKey}:${editor ? 'ready' : 'loading'}`)
+  const { viewportRef, contentRef, viewport, scale } = useAdaptiveMailScale(autoScale, `${layoutKey}:${editor ? 'ready' : 'loading'}`)
 
   useEffect(() => {
     if (!editor || editor.isDestroyed) return
@@ -69,6 +80,24 @@ export function RichMailEditor({ value, onChange, onNotice, autoScale, layoutKey
   }, [editor, value])
 
   useEffect(() => onScaleChange(scale), [onScaleChange, scale])
+
+  useEffect(() => () => window.clearTimeout(pointerReleaseTimer.current), [])
+
+  useEffect(() => {
+    const pending = pendingPointer.current
+    if (!editor || !pending || scale !== 1 || !viewport) return
+    pendingPointer.current = null
+    viewport.scrollLeft = Math.max(0, pending.localX - pending.viewportX)
+    viewport.scrollTop = Math.max(0, pending.localY - pending.viewportY)
+    requestAnimationFrame(() => {
+      const rect = viewport.getBoundingClientRect()
+      const position = editor.view.posAtCoords({
+        left: rect.left + pending.viewportX,
+        top: rect.top + pending.viewportY
+      })
+      editor.commands.focus(position?.pos ?? 'end')
+    })
+  }, [editor, scale, viewport])
 
   if (!editor) return <div className="rich-mail-editor loading">正在加载正文编辑器…</div>
 
@@ -98,10 +127,46 @@ export function RichMailEditor({ value, onChange, onNotice, autoScale, layoutKey
     }
   }
 
+  const handleScaledPointerDown = (event: React.PointerEvent<HTMLDivElement>): void => {
+    if (!autoScale || scale >= 1) return
+    const viewport = event.currentTarget
+    const surface = viewport.querySelector<HTMLElement>('.mail-scale-surface')
+    if (!surface) return
+    const viewportRect = viewport.getBoundingClientRect()
+    const surfaceRect = surface.getBoundingClientRect()
+    event.preventDefault()
+    event.stopPropagation()
+    pendingPointer.current = {
+      localX: (event.clientX - surfaceRect.left) / scale,
+      localY: (event.clientY - surfaceRect.top) / scale,
+      viewportX: event.clientX - viewportRect.left,
+      viewportY: event.clientY - viewportRect.top
+    }
+    suppressPointerSequence.current = true
+    onRequestActualSize()
+  }
+
+  const suppressScaledPointerEnd = (event: React.SyntheticEvent<HTMLDivElement>): void => {
+    if (!suppressPointerSequence.current) return
+    event.preventDefault()
+    event.stopPropagation()
+    window.clearTimeout(pointerReleaseTimer.current)
+    pointerReleaseTimer.current = window.setTimeout(() => {
+      suppressPointerSequence.current = false
+      editor?.commands.focus()
+    })
+  }
+
   return (
     <div className="rich-mail-editor" onPasteCapture={handlePaste}>
       <EditorToolbar editor={editor} />
-      <div ref={viewportRef} className="mail-scale-viewport editor-scale-viewport">
+      <div
+        ref={viewportRef}
+        className="mail-scale-viewport editor-scale-viewport"
+        onPointerDownCapture={handleScaledPointerDown}
+        onPointerUpCapture={suppressScaledPointerEnd}
+        onClickCapture={suppressScaledPointerEnd}
+      >
         <div ref={contentRef} className="mail-scale-surface" style={{ zoom: scale }}>
           <EditorContent editor={editor} />
         </div>

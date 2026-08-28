@@ -11,6 +11,7 @@ export function calculateAdaptiveScale(availableWidth: number, contentWidth: num
 type AdaptiveMailScale = {
   viewportRef: RefCallback<HTMLDivElement>
   contentRef: RefCallback<HTMLDivElement>
+  viewport: HTMLDivElement | null
   scale: number
 }
 
@@ -58,5 +59,5 @@ export function useAdaptiveMailScale(enabled: boolean, layoutKey: string): Adapt
     }
   }, [content, enabled, layoutKey, viewport])
 
-  return { viewportRef, contentRef, scale }
+  return { viewportRef, contentRef, viewport, scale }
 }
