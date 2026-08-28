@@ -9,6 +9,5 @@ export const homeFeature = defineRendererFeature({
     path: '/home',
     load: () => import('./HomePage').then(({ HomePage }) => ({ default: HomePage }))
   },
-  status: 'stable',
-  requires: ['ai-inspector.renderer']
+  status: 'stable'
 })
