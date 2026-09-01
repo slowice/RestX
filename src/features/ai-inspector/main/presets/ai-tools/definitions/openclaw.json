@@ -56,6 +56,7 @@
         "**/caches/**",
         "cache.*",
         "**/cache.*",
+        "**/*.trajectory.jsonl",
         "sandbox/**",
         "sandboxes/**",
         "**/sandbox/**",

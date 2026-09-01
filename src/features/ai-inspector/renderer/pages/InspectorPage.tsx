@@ -203,8 +203,11 @@ export function InspectorPage(): React.JSX.Element {
                     ? selectedFolder.files.map((item) => <CandidateRow key={item.path} candidate={item} selected={selectedConfig?.path === item.path || selectedJsonl?.path === item.path} loading={detailStatus === 'loading'} onOpen={openCandidate} onReveal={fileReveal.reveal} />)
                   : <div className="no-results">该文件夹中没有文件</div>
               ) : selectedTool ? (
-                selectedTool.folders.length > 0
-                  ? selectedTool.folders.map((folder) => <FolderRow key={folder.id} folder={folder} onOpen={() => selectFolder(folder.id)} />)
+                selectedTool.folders.length > 0 || selectedTool.id === 'openclaw'
+                  ? <>
+                      {selectedTool.folders.map((folder) => <FolderRow key={folder.id} folder={folder} onOpen={() => selectFolder(folder.id)} />)}
+                      {selectedTool.id === 'openclaw' && <ReservedTrajectoryRow />}
+                    </>
                   : <div className="no-results">已检测到 {selectedTool.displayName}，但没有找到预置范围内的配置或日志</div>
               ) : detectedTools.length > 0 ? (
                 detectedTools.map((tool) => <ToolFolderRow key={tool.id} tool={tool} onOpen={() => selectTool(tool.id)} />)
@@ -294,6 +297,17 @@ function FolderRow({ folder, onOpen }: { folder: ToolFolderNode; onOpen: () => v
       : folder.kind === 'conversation' ? '对话、思考与工具调用记录'
         : folder.kind === 'history' ? '命令与活动历史' : '运行与调试日志'
   return <FolderBase name={folder.name} description={description} count={folder.files.length} onOpen={onOpen} />
+}
+
+function ReservedTrajectoryRow(): React.JSX.Element {
+  return (
+    <div className="folder-row reserved-folder" aria-disabled="true">
+      <span className="folder-icon"><Folder size={20} /></span>
+      <span className="folder-copy"><strong>运行轨迹</strong><small>轨迹查看窗口已预留，暂未支持内容解析</small></span>
+      <span className="folder-count">暂未支持</span>
+      <ChevronRight size={17} />
+    </div>
+  )
 }
 
 function FolderBase({ name, description, count, onOpen }: { name: string; description: string; count: number; onOpen: () => void }): React.JSX.Element {
