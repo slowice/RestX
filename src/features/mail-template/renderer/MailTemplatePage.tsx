@@ -17,8 +17,8 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '../../../platform/renderer/components/PageHeader'
 import type { ImportedMailMessage, JsonObject, MailTemplate } from '../shared/contracts'
-import { parseJsonObject, renderMailTemplate, validateMailTemplate } from '../shared/template-engine'
-import { highlightMissingVariables, mailHtmlToText, plainTextToMailHtml, sanitizeMailHtml } from '../shared/rich-body'
+import { mergeJsonObjects, parseJsonObject, renderMailTemplate, validateMailTemplate } from '../shared/template-engine'
+import { highlightMissingVariables, mailHtmlToText, plainTextToMailHtml, sanitizeMailTemplateHtml } from '../shared/rich-body'
 import {
   createBlankTemplate,
   duplicateMailTemplate,
@@ -26,6 +26,7 @@ import {
   saveMailTemplates
 } from './template-storage'
 import { RichMailEditor } from './RichMailEditor'
+import { buildTemplateDataExample, expandDynamicRows } from './dynamic-rows'
 import { useAdaptiveMailScale } from './use-adaptive-mail-scale'
 import './mail-template.css'
 
@@ -75,15 +76,22 @@ export function MailTemplatePage(): React.JSX.Element {
     () => fromForm(form, defaultsResult.ok ? defaultsResult.value : {}),
     [form, defaultsResult]
   )
-  const rendered = useMemo(
-    () => renderMailTemplate(currentTemplate, perSendResult.ok ? perSendResult.value : {}),
-    [currentTemplate, perSendResult]
-  )
+  const renderState = useMemo(() => {
+    const perSendData = perSendResult.ok ? perSendResult.value : {}
+    const dynamicRows = expandDynamicRows(currentTemplate.bodyHtml, mergeJsonObjects(currentTemplate.defaults, perSendData))
+    const renderedTemplate = {
+      ...currentTemplate,
+      bodyHtml: dynamicRows.html,
+      bodyText: mailHtmlToText(dynamicRows.html)
+    }
+    return { rendered: renderMailTemplate(renderedTemplate, perSendData), dynamicRows }
+  }, [currentTemplate, perSendResult])
+  const { rendered, dynamicRows } = renderState
   const inputErrors = [
     ...(defaultsResult.ok ? [] : [`默认 JSON：${defaultsResult.error}`]),
     ...(perSendResult.ok ? [] : [`本次 JSON：${perSendResult.error}`])
   ]
-  const allIssues = [...inputErrors, ...rendered.issues.map((issue) => issue.message)]
+  const allIssues = [...inputErrors, ...dynamicRows.errors, ...rendered.issues.map((issue) => issue.message)]
   const savedTemplate = templates.find((template) => template.id === selectedId)
   const isDirty = !savedTemplate || JSON.stringify(toForm(savedTemplate)) !== JSON.stringify(form)
   const canOpen = allIssues.length === 0 && !opening
@@ -193,6 +201,12 @@ export function MailTemplatePage(): React.JSX.Element {
     setOpening(true)
     setNotice(null)
     try {
+      console.info('[mail-template:dynamic-rows][04] handoff-ready', {
+        action: 'outlook',
+        bindingCount: dynamicRows.bindingCount,
+        generatedRowCount: dynamicRows.generatedRowCount,
+        warningCount: dynamicRows.warnings.length
+      })
       await window.restx.mailTemplates.openDraft(rendered.draft)
       setNotice({ kind: 'success', text: '已在经典 Outlook 中打开草稿，请检查后再发送。' })
     } catch (reason) {
@@ -205,6 +219,12 @@ export function MailTemplatePage(): React.JSX.Element {
   const copyRichBody = async (): Promise<void> => {
     if (!canOpen) return
     try {
+      console.info('[mail-template:dynamic-rows][04] handoff-ready', {
+        action: 'clipboard',
+        bindingCount: dynamicRows.bindingCount,
+        generatedRowCount: dynamicRows.generatedRowCount,
+        warningCount: dynamicRows.warnings.length
+      })
       if (!globalThis.ClipboardItem || !navigator.clipboard?.write) throw new Error('当前环境不支持富文本剪贴板。')
       await navigator.clipboard.write([new ClipboardItem({
         'text/html': new Blob([rendered.draft.bodyHtml], { type: 'text/html' }),
@@ -213,6 +233,16 @@ export function MailTemplatePage(): React.JSX.Element {
       setNotice({ kind: 'success', text: '已复制富文本正文，可直接粘贴到 Outlook。' })
     } catch (reason) {
       setNotice({ kind: 'error', text: errorMessage(reason, '复制失败，请在预览区手动选择正文。') })
+    }
+  }
+
+  const copyDataExample = async (): Promise<void> => {
+    try {
+      const example = JSON.stringify(buildTemplateDataExample(currentTemplate), null, 2)
+      await navigator.clipboard.writeText(example)
+      setNotice({ kind: 'success', text: '已复制当前模板的数据 JSON 示例，可直接交给 Skill 作为输出格式。' })
+    } catch (reason) {
+      setNotice({ kind: 'error', text: errorMessage(reason, '复制数据示例失败。') })
     }
   }
 
@@ -267,7 +297,7 @@ export function MailTemplatePage(): React.JSX.Element {
               <Field label="邮件标题"><input aria-label="邮件标题" value={form.subject} onChange={(event) => updateForm(setForm, 'subject', event.target.value)} /></Field>
             </div>
             <div className="mail-body-focus">
-              <Field label="邮件正文" hint="支持从 Excel 直接粘贴表格；用 {{变量名}} 标记每次需要替换的内容">
+              <Field label="邮件正文" hint="支持从 Excel 直接粘贴表格；普通内容用 {{变量名}}，表格行可在工具栏设为数据行" group>
                 <RichMailEditor
                   value={form.bodyHtml}
                   onChange={(value) => updateForm(setForm, 'bodyHtml', value)}
@@ -304,6 +334,7 @@ export function MailTemplatePage(): React.JSX.Element {
             <div className="mail-reuse-secondary">
               <Field label="本次 JSON" hint="留空或填写 {} 时全部使用默认值"><textarea aria-label="本次 JSON" className={`json-editor per-send-editor ${perSendResult.ok ? '' : 'invalid'}`} rows={8} spellCheck={false} value={perSendJson} onChange={(event) => setPerSendJson(event.target.value)} /></Field>
               {!perSendResult.ok && <InlineError text={perSendResult.error} />}
+              <button type="button" className="button compact copy-data-example" onClick={() => void copyDataExample()}><Clipboard size={13} />复制数据示例</button>
             </div>
 
             <div className="preview-card">
@@ -323,6 +354,7 @@ export function MailTemplatePage(): React.JSX.Element {
             </div>
 
             {allIssues.length > 0 && <div className="issue-list" role="alert"><div><AlertCircle size={15} /><strong>还需要处理</strong></div><ul>{allIssues.map((issue, index) => <li key={`${issue}-${index}`}>{issue}</li>)}</ul></div>}
+            {dynamicRows.warnings.length > 0 && <div className="warning-list" role="status"><div><AlertCircle size={15} /><strong>动态表格提示</strong></div><ul>{dynamicRows.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div>}
           </div>
           <div className="handoff-actions">
             <div><strong>不会自动发送</strong><span>打开经典 Outlook 后由你最后确认</span></div>
@@ -363,8 +395,11 @@ function AdaptivePreviewBody({ html, autoScale, layoutKey, onScaleChange }: { ht
   </div>
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }): React.JSX.Element {
-  return <label className="mail-field"><span>{label}</span>{children}{hint && <small>{hint}</small>}</label>
+function Field({ label, hint, children, group = false }: { label: string; hint?: string; children: React.ReactNode; group?: boolean }): React.JSX.Element {
+  const content = <><span>{label}</span>{children}{hint && <small>{hint}</small>}</>
+  return group
+    ? <div className="mail-field" role="group" aria-label={label}>{content}</div>
+    : <label className="mail-field">{content}</label>
 }
 
 function InlineError({ text }: { text: string }): React.JSX.Element {
@@ -389,7 +424,7 @@ function toForm(template: MailTemplate): TemplateForm {
 
 function fromForm(form: TemplateForm, defaults: JsonObject): MailTemplate {
   const { defaultsJson: _defaultsJson, ...template } = form
-  const bodyHtml = sanitizeMailHtml(template.bodyHtml).html
+  const bodyHtml = sanitizeMailTemplateHtml(template.bodyHtml).html
   return { ...template, bodyHtml, bodyText: mailHtmlToText(bodyHtml), defaults }
 }
 

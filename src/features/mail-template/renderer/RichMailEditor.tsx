@@ -1,11 +1,12 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import TextAlign from '@tiptap/extension-text-align'
 import { BackgroundColor, Color, FontFamily, FontSize, TextStyle } from '@tiptap/extension-text-style'
 import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table'
 import { normalizeClipboardTable } from './excel-paste'
-import { sanitizeMailHtml, sanitizeMailStyle } from '../shared/rich-body'
+import { suggestRowAlias, VARIABLE_ALIAS_PATTERN, VARIABLE_PATH_PATTERN } from './dynamic-rows'
+import { sanitizeMailHtml, sanitizeMailStyle, sanitizeMailTemplateHtml } from '../shared/rich-body'
 import { useAdaptiveMailScale } from './use-adaptive-mail-scale'
 
 type RichMailEditorProps = {
@@ -33,7 +34,12 @@ const StyledTable = Table.extend({
 
 const StyledTableRow = TableRow.extend({
   addAttributes() {
-    return { ...(this.parent?.() ?? {}), style: styleAttribute('tr') }
+    return {
+      ...(this.parent?.() ?? {}),
+      style: styleAttribute('tr'),
+      repeatPath: dataAttribute('data-repeat-path'),
+      repeatAlias: dataAttribute('data-repeat-alias')
+    }
   }
 })
 
@@ -50,6 +56,10 @@ const StyledTableHeader = TableHeader.extend({
 })
 
 export function RichMailEditor({ value, onChange, onNotice, autoScale, layoutKey, onScaleChange, onRequestActualSize }: RichMailEditorProps): React.JSX.Element {
+  const [, setSelectionRevision] = useState(0)
+  const [bindingPanelOpen, setBindingPanelOpen] = useState(false)
+  const [bindingPath, setBindingPath] = useState('items')
+  const [bindingAlias, setBindingAlias] = useState('item')
   const pendingPointer = useRef<PendingEditorPointer | null>(null)
   const suppressPointerSequence = useRef(false)
   const pointerReleaseTimer = useRef(0)
@@ -69,15 +79,38 @@ export function RichMailEditor({ value, onChange, onNotice, autoScale, layoutKey
     ],
     content: value,
     editorProps: { attributes: { class: 'rich-mail-content', 'aria-label': '邮件正文' } },
-    onUpdate: ({ editor }) => onChange(sanitizeMailHtml(editor.getHTML()).html)
+    onUpdate: ({ editor }) => {
+      const html = sanitizeMailTemplateHtml(editor.getHTML()).html
+      console.info('[mail-template:dynamic-rows][00] editor-updated', {
+        hasBinding: html.includes('data-repeat-path='),
+        htmlLength: html.length
+      })
+      onChange(html)
+    }
   })
   const { viewportRef, contentRef, viewport, scale } = useAdaptiveMailScale(autoScale, `${layoutKey}:${editor ? 'ready' : 'loading'}`)
 
   useEffect(() => {
     if (!editor || editor.isDestroyed) return
-    const sanitized = sanitizeMailHtml(value).html
-    if (sanitizeMailHtml(editor.getHTML()).html !== sanitized) editor.commands.setContent(sanitized, { emitUpdate: false })
+    const sanitized = sanitizeMailTemplateHtml(value).html
+    const current = sanitizeMailTemplateHtml(editor.getHTML()).html
+    if (current !== sanitized) {
+      console.info('[mail-template:dynamic-rows][00] editor-synchronized', {
+        currentHasBinding: current.includes('data-repeat-path='),
+        incomingHasBinding: sanitized.includes('data-repeat-path='),
+        currentLength: current.length,
+        incomingLength: sanitized.length
+      })
+      editor.commands.setContent(sanitized, { emitUpdate: false })
+    }
   }, [editor, value])
+
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return
+    const refreshToolbar = (): void => setSelectionRevision((current) => current + 1)
+    editor.on('selectionUpdate', refreshToolbar)
+    return () => editor.off('selectionUpdate', refreshToolbar)
+  }, [editor])
 
   useEffect(() => onScaleChange(scale), [onScaleChange, scale])
 
@@ -159,7 +192,38 @@ export function RichMailEditor({ value, onChange, onNotice, autoScale, layoutKey
 
   return (
     <div className="rich-mail-editor" onPasteCapture={handlePaste}>
-      <EditorToolbar editor={editor} />
+      <EditorToolbar
+        editor={editor}
+        bindingPanelOpen={bindingPanelOpen}
+        onOpenBinding={() => {
+          const attributes = editor.getAttributes('tableRow')
+          const path = typeof attributes.repeatPath === 'string' && attributes.repeatPath ? attributes.repeatPath : 'items'
+          setBindingPath(path)
+          setBindingAlias(typeof attributes.repeatAlias === 'string' && attributes.repeatAlias ? attributes.repeatAlias : suggestRowAlias(path))
+          setBindingPanelOpen(true)
+        }}
+        onRemoveBinding={() => {
+          if (!editor.isActive('table')) return
+          updateSelectedTableRowAttributes(editor, { repeatPath: null, repeatAlias: null })
+          onChange(sanitizeMailTemplateHtml(editor.getHTML()).html)
+          setBindingPanelOpen(false)
+          onNotice('当前表格行已恢复为普通固定行。')
+        }}
+      />
+      {bindingPanelOpen && <RowBindingPanel
+        editor={editor}
+        path={bindingPath}
+        alias={bindingAlias}
+        onPathChange={(path) => {
+          setBindingPath(path)
+          setBindingAlias(suggestRowAlias(path))
+        }}
+        onAliasChange={setBindingAlias}
+        onCancel={() => setBindingPanelOpen(false)}
+        onNotice={onNotice}
+        onContentChange={(html) => onChange(sanitizeMailTemplateHtml(html).html)}
+        onApplied={() => setBindingPanelOpen(false)}
+      />}
       <div
         ref={viewportRef}
         className="mail-scale-viewport editor-scale-viewport"
@@ -175,8 +239,15 @@ export function RichMailEditor({ value, onChange, onNotice, autoScale, layoutKey
   )
 }
 
-function EditorToolbar({ editor }: { editor: Editor }): React.JSX.Element {
+function EditorToolbar({ editor, bindingPanelOpen, onOpenBinding, onRemoveBinding }: {
+  editor: Editor
+  bindingPanelOpen: boolean
+  onOpenBinding(): void
+  onRemoveBinding(): void
+}): React.JSX.Element {
   const inTable = editor.isActive('table')
+  const rowAttributes = editor.getAttributes('tableRow')
+  const rowIsBound = typeof rowAttributes.repeatPath === 'string' && rowAttributes.repeatPath.length > 0
   const cellStyle = currentCellStyle(editor)
   return (
     <div className="rich-editor-toolbar" role="toolbar" aria-label="邮件正文格式">
@@ -200,6 +271,8 @@ function EditorToolbar({ editor }: { editor: Editor }): React.JSX.Element {
       <Tool label="删列" disabled={!editor.can().deleteColumn()} run={() => editor.chain().focus().deleteColumn().run()} />
       <Tool label="合并" disabled={!editor.can().mergeCells()} run={() => editor.chain().focus().mergeCells().run()} />
       <Tool label="拆分" disabled={!editor.can().splitCell()} run={() => editor.chain().focus().splitCell().run()} />
+      <Tool label={rowIsBound ? '修改数据行' : '设为数据行'} active={bindingPanelOpen || rowIsBound} disabled={!inTable} run={onOpenBinding} />
+      <Tool label="取消数据行" disabled={!inTable || !rowIsBound} run={onRemoveBinding} />
       <Tool label="单元格左" disabled={!inTable} run={() => updateCellStyle(editor, 'text-align', 'left')} />
       <Tool label="单元格中" disabled={!inTable} run={() => updateCellStyle(editor, 'text-align', 'center')} />
       <Tool label="单元格右" disabled={!inTable} run={() => updateCellStyle(editor, 'text-align', 'right')} />
@@ -208,6 +281,61 @@ function EditorToolbar({ editor }: { editor: Editor }): React.JSX.Element {
       <Tool label="删除表格" disabled={!editor.can().deleteTable()} run={() => editor.chain().focus().deleteTable().run()} />
     </div>
   )
+}
+
+function RowBindingPanel({ editor, path, alias, onPathChange, onAliasChange, onCancel, onNotice, onContentChange, onApplied }: {
+  editor: Editor
+  path: string
+  alias: string
+  onPathChange(value: string): void
+  onAliasChange(value: string): void
+  onCancel(): void
+  onNotice(message: string, kind?: 'success' | 'error'): void
+  onContentChange(html: string): void
+  onApplied(): void
+}): React.JSX.Element {
+  const apply = (): void => {
+    const normalizedPath = path.trim()
+    const normalizedAlias = alias.trim()
+    if (!VARIABLE_PATH_PATTERN.test(normalizedPath)) {
+      onNotice('数组路径格式无效，请填写 items 或 report.items 这类路径。', 'error')
+      return
+    }
+    if (!VARIABLE_ALIAS_PATTERN.test(normalizedAlias)) {
+      onNotice('行别名格式无效，请使用 item 这类单个名称。', 'error')
+      return
+    }
+    const selectedRow = selectedTableRow(editor)
+    if (!selectedRow) {
+      onNotice('请先把光标放在要重复的表格行中。', 'error')
+      return
+    }
+    if (Array.from(selectedRow.cells).some((cell) => cell.rowSpan > 1)) {
+      onNotice('动态数据行不能包含跨行合并单元格，请先拆分后再设置。', 'error')
+      return
+    }
+    const table = selectedRow.closest('table')
+    const otherBoundRow = table && Array.from(table.querySelectorAll<HTMLTableRowElement>('tr[data-repeat-path]'))
+      .some((row) => row !== selectedRow)
+    if (otherBoundRow) {
+      onNotice('一张表格只能设置一个动态数据行。', 'error')
+      return
+    }
+    if (!updateSelectedTableRowAttributes(editor, { repeatPath: normalizedPath, repeatAlias: normalizedAlias })) {
+      onNotice('无法设置当前表格行，请重新把光标放入该行后再试。', 'error')
+      return
+    }
+    onContentChange(editor.getHTML())
+    onNotice(`已将当前行绑定到 ${normalizedPath}，行内变量请使用 {{${normalizedAlias}.字段名}}。`)
+    window.setTimeout(onApplied, 0)
+  }
+
+  return <div className="dynamic-row-binding-panel" aria-label="动态数据行设置">
+    <label><span>数组路径</span><input aria-label="动态行数组路径" value={path} onChange={(event) => onPathChange(event.target.value)} placeholder="items" /></label>
+    <label><span>行别名</span><input aria-label="动态行别名" value={alias} onChange={(event) => onAliasChange(event.target.value)} placeholder="item" /></label>
+    <small>例如数组路径 items，对应行内变量 {'{{item.name}}'}。</small>
+    <div><button type="button" className="button compact" onClick={onCancel}>取消</button><button type="button" className="button compact primary" onClick={apply}>应用</button></div>
+  </div>
 }
 
 function Tool({ label, active = false, disabled = false, run }: { label: string; active?: boolean; disabled?: boolean; run(): void }): React.JSX.Element {
@@ -224,6 +352,39 @@ function styleAttribute(tag: 'table' | 'tr' | 'th' | 'td') {
     parseHTML: (element: HTMLElement) => sanitizeMailStyle(element.getAttribute('style') ?? '', tag),
     renderHTML: (attributes: Record<string, unknown>) => typeof attributes.style === 'string' && attributes.style ? { style: attributes.style } : {}
   }
+}
+
+function dataAttribute(attribute: 'data-repeat-path' | 'data-repeat-alias') {
+  return {
+    default: null,
+    parseHTML: (element: HTMLElement) => element.getAttribute(attribute),
+    renderHTML: (attributes: Record<string, unknown>) => {
+      const key = attribute === 'data-repeat-path' ? 'repeatPath' : 'repeatAlias'
+      return typeof attributes[key] === 'string' && attributes[key] ? { [attribute]: attributes[key] } : {}
+    }
+  }
+}
+
+function selectedTableRow(editor: Editor): HTMLTableRowElement | null {
+  const position = editor.view.domAtPos(editor.state.selection.from)
+  const element = position.node instanceof HTMLElement ? position.node : position.node.parentElement
+  return element?.closest<HTMLTableRowElement>('tr') ?? null
+}
+
+function updateSelectedTableRowAttributes(editor: Editor, attributes: { repeatPath: string | null; repeatAlias: string | null }): boolean {
+  const { $from } = editor.state.selection
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const node = $from.node(depth)
+    if (node.type.name !== 'tableRow') continue
+    const transaction = editor.state.tr.setNodeMarkup($from.before(depth), undefined, { ...node.attrs, ...attributes })
+    editor.view.dispatch(transaction)
+    console.info('[mail-template:dynamic-rows][00] binding-updated', {
+      hasPath: Boolean(editor.getAttributes('tableRow').repeatPath),
+      removing: attributes.repeatPath === null
+    })
+    return true
+  }
+  return false
 }
 
 function currentCellStyle(editor: Editor): string {

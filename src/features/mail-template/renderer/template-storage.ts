@@ -1,5 +1,5 @@
 import type { JsonObject, MailTemplate } from '../shared/contracts'
-import { mailHtmlToText, plainTextToMailHtml, sanitizeMailHtml } from '../shared/rich-body'
+import { mailHtmlToText, plainTextToMailHtml, sanitizeMailTemplateHtml } from '../shared/rich-body'
 
 export const MAIL_TEMPLATE_STORAGE_KEY = 'restx:mail-template:library:v2'
 export const LEGACY_MAIL_TEMPLATE_STORAGE_KEY = 'restx:mail-template:library:v1'
@@ -113,7 +113,7 @@ function isMailTemplate(value: unknown): value is MailTemplate {
   if (!value || typeof value !== 'object') return false
   const input = value as Record<string, unknown>
   if (!hasCommonTemplateFields(input) || typeof input.bodyHtml !== 'string' || typeof input.bodyText !== 'string') return false
-  const sanitized = sanitizeMailHtml(input.bodyHtml)
+  const sanitized = sanitizeMailTemplateHtml(input.bodyHtml)
   return !sanitized.changed && mailHtmlToText(sanitized.html) === input.bodyText
 }
 
@@ -126,7 +126,7 @@ function isJsonObject(value: unknown): value is JsonObject {
 }
 
 function copyTemplate(template: MailTemplate): MailTemplate {
-  const bodyHtml = sanitizeMailHtml(template.bodyHtml).html
+  const bodyHtml = sanitizeMailTemplateHtml(template.bodyHtml).html
   return { ...template, bodyHtml, bodyText: mailHtmlToText(bodyHtml), defaults: JSON.parse(JSON.stringify(template.defaults)) as JsonObject }
 }
 

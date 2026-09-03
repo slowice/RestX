@@ -7,7 +7,7 @@ import {
   type MailValidationIssue,
   type RenderedMailTemplate
 } from './contracts'
-import { escapeHtml, mailHtmlToText, mapMailHtmlText, sanitizeMailHtml } from './rich-body'
+import { escapeHtml, mailHtmlToText, mapMailHtmlText, sanitizeMailHtml, sanitizeMailTemplateHtml } from './rich-body'
 
 const PLACEHOLDER_PATTERN = /\{\{\s*([A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_-]*)*)\s*\}\}/g
 const EMAIL_PATTERN = /^[^\s<>@,;]+@[^\s<>@,;]+\.[^\s<>@,;]+$/
@@ -138,7 +138,7 @@ export function validateMailTemplate(template: MailTemplate): string[] {
   if (template.name.length > MAIL_TEMPLATE_LIMITS.name) errors.push(`模板名称不能超过 ${MAIL_TEMPLATE_LIMITS.name} 个字符。`)
   if (!template.to.trim()) errors.push('收件人模板不能为空。')
   if (!template.subject.trim()) errors.push('标题模板不能为空。')
-  const sanitized = sanitizeMailHtml(template.bodyHtml)
+  const sanitized = sanitizeMailTemplateHtml(template.bodyHtml)
   if (sanitized.changed) errors.push('正文模板包含不受支持或不安全的格式。')
   if (!template.bodyText.trim()) errors.push('正文模板不能为空。')
   if (mailHtmlToText(sanitized.html) !== template.bodyText) errors.push('正文模板的纯文本内容与富文本不一致。')

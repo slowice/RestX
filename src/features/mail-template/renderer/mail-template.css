@@ -54,6 +54,12 @@
 .rich-editor-toolbar button, .color-tool { display: inline-flex; min-height: 24px; align-items: center; justify-content: center; padding: 3px 6px; color: #555; border: 1px solid #ddd; border-radius: 5px; background: #fff; font-size: var(--font-size-meta); cursor: pointer; }
 .rich-editor-toolbar button:hover:not(:disabled), .rich-editor-toolbar button.active { color: #087d62; border-color: #9bdac9; background: #effaf6; }
 .rich-editor-toolbar button:disabled, .color-tool.disabled { opacity: .42; cursor: not-allowed; }
+.dynamic-row-binding-panel { display: grid; grid-template-columns: minmax(130px, 1fr) minmax(110px, .8fr) auto; align-items: end; gap: 8px; padding: 9px; border-bottom: 1px solid #cdebe2; background: #f2fbf8; }
+.dynamic-row-binding-panel label { display: flex; min-width: 0; flex-direction: column; gap: 4px; color: #42635b; font-size: var(--font-size-meta); font-weight: 700; }
+.dynamic-row-binding-panel input { min-width: 0; height: 30px; padding: 4px 7px; border: 1px solid #a9d8cc; border-radius: 6px; outline: none; background: #fff; font: var(--font-size-meta) 'SFMono-Regular', Consolas, monospace; }
+.dynamic-row-binding-panel input:focus { border-color: #10a37f; box-shadow: 0 0 0 2px rgba(16, 163, 127, .1); }
+.dynamic-row-binding-panel small { align-self: center; color: #648078; font-size: var(--font-size-meta); line-height: 1.35; }
+.dynamic-row-binding-panel > div { display: flex; gap: 5px; }
 .toolbar-separator { width: 1px; margin: 2px; background: #ddd; }
 .color-tool { gap: 4px; }
 .color-tool span { white-space: nowrap; }
@@ -71,10 +77,13 @@
 .rich-mail-content th, .rich-preview th { background: #f4f4f4; font-weight: 700; }
 .rich-mail-content .selectedCell::after { position: absolute; inset: 0; z-index: 2; content: ''; pointer-events: none; background: rgba(16, 163, 127, .14); }
 .rich-mail-content td, .rich-mail-content th { position: relative; }
+.rich-mail-content tr[data-repeat-path] { position: relative; outline: 2px solid rgba(16, 163, 127, .7); outline-offset: -2px; }
+.rich-mail-content tr[data-repeat-path]::after { position: absolute; top: 50%; left: calc(100% + 6px); z-index: 4; max-width: 140px; padding: 2px 5px; overflow: hidden; color: #076d56; border: 1px solid #9bdac9; border-radius: 4px; content: '动态行 · ' attr(data-repeat-path); background: rgba(239, 250, 246, .96); font: 11px/1.3 Inter, system-ui, sans-serif; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; transform: translateY(-50%); }
 .rich-mail-content .column-resize-handle { position: absolute; top: 0; right: -2px; bottom: -2px; z-index: 5; width: 4px; pointer-events: none; background: #10a37f; }
 .rich-mail-content.resize-cursor { cursor: col-resize; }
 .json-editor { font-family: 'SFMono-Regular', Consolas, monospace; font-size: var(--font-size-meta) !important; tab-size: 2; }
 .per-send-editor { min-height: 135px; background: #fbfbfb !important; }
+.copy-data-example { margin: -4px 0 10px; }
 .editor-actions { display: flex; gap: 7px; padding: 11px 13px; border-top: 1px solid #e8e8e8; background: #fafafa; }
 .editor-actions .button { padding: 0 11px; }
 .inline-error { display: flex; align-items: flex-start; gap: 6px; margin: -5px 0 11px; color: #b31d25; font-size: var(--font-size-meta); line-height: 1.45; }
@@ -101,6 +110,10 @@
 .issue-list > div { display: flex; align-items: center; gap: 6px; }
 .issue-list strong { font-size: var(--font-size-meta); }
 .issue-list ul { margin: 7px 0 0 22px; padding: 0; font-size: var(--font-size-meta); line-height: 1.6; }
+.warning-list { margin-top: 10px; padding: 10px 11px; color: #496a61; border: 1px solid #cdebe2; border-radius: 9px; background: #f2fbf8; }
+.warning-list > div { display: flex; align-items: center; gap: 6px; }
+.warning-list strong { font-size: var(--font-size-meta); }
+.warning-list ul { margin: 7px 0 0 22px; padding: 0; font-size: var(--font-size-meta); line-height: 1.6; }
 .handoff-actions { display: flex; min-height: 64px; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 13px; border-top: 1px solid #e5e5e5; background: #fff; }
 .handoff-actions > div { display: flex; flex-direction: column; gap: 3px; }
 .handoff-actions strong { color: #333; font-size: var(--font-size-meta); }

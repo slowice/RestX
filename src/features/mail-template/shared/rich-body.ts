@@ -66,11 +66,27 @@ const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   enforceHtmlBoundary: true
 }
 
+const TEMPLATE_SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
+  ...SANITIZE_OPTIONS,
+  allowedAttributes: {
+    ...SANITIZE_OPTIONS.allowedAttributes,
+    tr: ['style', 'data-repeat-path', 'data-repeat-alias']
+  }
+}
+
 export type SanitizedMailHtml = { html: string; changed: boolean }
 
 export function sanitizeMailHtml(source: string): SanitizedMailHtml {
+  return sanitizeWithOptions(source, SANITIZE_OPTIONS)
+}
+
+export function sanitizeMailTemplateHtml(source: string): SanitizedMailHtml {
+  return sanitizeWithOptions(source, TEMPLATE_SANITIZE_OPTIONS)
+}
+
+function sanitizeWithOptions(source: string, options: sanitizeHtml.IOptions): SanitizedMailHtml {
   const withoutNulls = source.replace(/\u0000/g, '')
-  const html = sanitizeHtml(withoutNulls, SANITIZE_OPTIONS).trim()
+  const html = sanitizeHtml(withoutNulls, options).trim()
   return { html, changed: html !== source.trim() }
 }
 
