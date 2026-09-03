@@ -19,6 +19,18 @@ export type HomeTaskColumn = {
   label: string
   type: HomeTaskColumnType
   options?: string[]
+  width?: number
+}
+
+export const HOME_TASK_COLUMN_MIN_WIDTH = 90
+export const HOME_TASK_COLUMN_MAX_WIDTH = 600
+
+export function getDefaultHomeTaskColumnWidth(column: Pick<HomeTaskColumn, 'id' | 'type'>): number {
+  if (column.id === 'date') return 140
+  if (column.id === 'task' || column.id === 'notes') return 300
+  if (column.id === 'status') return 130
+  if (column.id === 'priority') return 110
+  return column.type === 'text' ? 180 : 140
 }
 
 export type HomeTaskRow = {

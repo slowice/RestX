@@ -1,7 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import { chmod, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import type { HomeTaskColumn, HomeTaskRow, HomeTaskTable } from '../shared/contracts'
+import {
+  getDefaultHomeTaskColumnWidth,
+  HOME_TASK_COLUMN_MAX_WIDTH,
+  HOME_TASK_COLUMN_MIN_WIDTH,
+  type HomeTaskColumn,
+  type HomeTaskRow,
+  type HomeTaskTable
+} from '../shared/contracts'
 import { HomeError } from './home-error'
 import { getHomeConfigRoot } from './storage-root'
 
@@ -15,11 +22,11 @@ export function createDefaultTaskTable(): HomeTaskTable {
   return {
     version: 1,
     columns: [
-      { id: 'date', label: '日期', type: 'date' },
-      { id: 'task', label: '任务内容', type: 'text' },
-      { id: 'status', label: '状态', type: 'select', options: ['待办', '进行中', '完成'] },
-      { id: 'priority', label: '优先级', type: 'select', options: ['低', '中', '高'] },
-      { id: 'notes', label: '备注', type: 'text' }
+      { id: 'date', label: '日期', type: 'date', width: 140 },
+      { id: 'task', label: '任务内容', type: 'text', width: 300 },
+      { id: 'status', label: '状态', type: 'select', options: ['待办', '进行中', '完成'], width: 130 },
+      { id: 'priority', label: '优先级', type: 'select', options: ['低', '中', '高'], width: 110 },
+      { id: 'notes', label: '备注', type: 'text', width: 300 }
     ],
     rows: []
   }
@@ -38,6 +45,9 @@ function assertColumn(value: unknown): asserts value is HomeTaskColumn {
     }
   } else if (column.options !== undefined) {
     throw new HomeError('INVALID_INPUT', '非下拉列不能包含选项。')
+  }
+  if (column.width !== undefined && (!Number.isInteger(column.width) || column.width < HOME_TASK_COLUMN_MIN_WIDTH || column.width > HOME_TASK_COLUMN_MAX_WIDTH)) {
+    throw new HomeError('INVALID_INPUT', '任务列宽度无效。')
   }
 }
 
@@ -76,7 +86,11 @@ export function assertTaskTable(value: unknown): asserts value is HomeTaskTable 
 function cloneTable(table: HomeTaskTable): HomeTaskTable {
   return {
     version: 1,
-    columns: table.columns.map((column) => ({ ...column, ...(column.options ? { options: [...column.options] } : {}) })),
+    columns: table.columns.map((column) => ({
+      ...column,
+      ...(column.options ? { options: [...column.options] } : {}),
+      width: column.width ?? getDefaultHomeTaskColumnWidth(column)
+    })),
     rows: table.rows.map((row) => ({ ...row, cells: { ...row.cells } }))
   }
 }

@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertCircle, CalendarDays, Columns3, ListTodo, LockKeyhole, LogIn, Plus, Search, Trash2, UserRound } from 'lucide-react'
 import { PageHeader } from '../../../platform/renderer/components/PageHeader'
-import type { HomeLoginState, HomeTaskColumn, HomeTaskRow, HomeTaskTable } from '../shared/contracts'
+import {
+  getDefaultHomeTaskColumnWidth,
+  HOME_TASK_COLUMN_MAX_WIDTH,
+  HOME_TASK_COLUMN_MIN_WIDTH,
+  type HomeLoginState,
+  type HomeTaskColumn,
+  type HomeTaskRow,
+  type HomeTaskTable
+} from '../shared/contracts'
 import './home.css'
 
 type SaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'failed'
@@ -42,6 +50,7 @@ export function HomePage(): React.JSX.Element {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const revisionRef = useRef(0)
   const savedRevisionRef = useRef(0)
+  const resizeCleanupRef = useRef<(() => void) | null>(null)
 
   async function loadTable(): Promise<void> {
     setTableError(null)
@@ -81,6 +90,7 @@ export function HomePage(): React.JSX.Element {
   }, [loginState?.callbackStatus])
 
   useEffect(() => () => {
+    resizeCleanupRef.current?.()
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current)
       const pending = tableRef.current
@@ -152,7 +162,53 @@ export function HomePage(): React.JSX.Element {
   function addColumn(): void {
     if (!table) return
     const number = table.columns.filter((column) => column.id.startsWith('custom-')).length + 1
-    applyTable({ ...table, columns: [...table.columns, { id: `custom-${crypto.randomUUID()}`, label: `新列 ${number}`, type: 'text' }] })
+    applyTable({ ...table, columns: [...table.columns, { id: `custom-${crypto.randomUUID()}`, label: `新列 ${number}`, type: 'text', width: 180 }] })
+  }
+
+  function columnWidth(column: HomeTaskColumn): number {
+    return column.width ?? getDefaultHomeTaskColumnWidth(column)
+  }
+
+  function setColumnWidth(columnId: string, width: number, save: boolean): void {
+    const current = tableRef.current
+    if (!current) return
+    const next = { ...current, columns: current.columns.map((column) => column.id === columnId ? { ...column, width } : column) }
+    if (save) applyTable(next)
+    else {
+      tableRef.current = next
+      setTable(next)
+      setSaveStatus('pending')
+    }
+  }
+
+  function beginColumnResize(event: React.PointerEvent<HTMLSpanElement>, column: HomeTaskColumn): void {
+    event.preventDefault()
+    event.stopPropagation()
+    resizeCleanupRef.current?.()
+    const startX = event.clientX
+    const startWidth = columnWidth(column)
+    let currentWidth = startWidth
+    let moved = false
+
+    const onMove = (moveEvent: PointerEvent): void => {
+      moved = true
+      currentWidth = Math.min(HOME_TASK_COLUMN_MAX_WIDTH, Math.max(HOME_TASK_COLUMN_MIN_WIDTH, Math.round(startWidth + moveEvent.clientX - startX)))
+      setColumnWidth(column.id, currentWidth, false)
+    }
+    const cleanup = (): void => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+      resizeCleanupRef.current = null
+    }
+    const onUp = (): void => {
+      cleanup()
+      if (moved) setColumnWidth(column.id, currentWidth, true)
+    }
+    resizeCleanupRef.current = cleanup
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
   }
 
   function removeColumn(column: HomeTaskColumn): void {
@@ -221,8 +277,9 @@ export function HomePage(): React.JSX.Element {
       {table ? (
         <section className="home-table-card">
           <div className="home-table-scroll">
-            <table className="home-task-table" style={{ minWidth: Math.max(850, table.columns.length * 165 + 58) }}>
-              <thead><tr>{table.columns.map((column) => <th key={column.id}><div className="home-column-head"><input aria-label={`列名：${column.label}`} maxLength={80} value={column.label} onChange={(event) => renameColumn(column.id, event.target.value)} /><button aria-label={`删除${column.label}列`} disabled={table.columns.length === 1} type="button" onClick={() => removeColumn(column)}><Trash2 size={13} /></button></div></th>)}<th className="home-row-actions-head">操作</th></tr></thead>
+            <table className="home-task-table" style={{ width: table.columns.reduce((sum, column) => sum + columnWidth(column), 58) }}>
+              <colgroup>{table.columns.map((column) => <col key={column.id} style={{ width: columnWidth(column) }} />)}<col style={{ width: 58 }} /></colgroup>
+              <thead><tr>{table.columns.map((column) => <th key={column.id}><div className="home-column-head"><input aria-label={`列名：${column.label}`} maxLength={80} value={column.label} onChange={(event) => renameColumn(column.id, event.target.value)} /><button aria-label={`删除${column.label}列`} disabled={table.columns.length === 1} type="button" onClick={() => removeColumn(column)}><Trash2 size={13} /></button></div><span className="home-column-resize" role="separator" aria-label={`调整${column.label}列宽`} onPointerDown={(event) => beginColumnResize(event, column)} /></th>)}<th className="home-row-actions-head">操作</th></tr></thead>
               <tbody>{visibleRows.map((row) => <tr key={row.id}>{table.columns.map((column) => <td key={column.id}><TaskCell column={column} value={row.cells[column.id] ?? ''} onChange={(value) => updateCell(row.id, column.id, value)} /></td>)}<td className="home-row-actions"><button aria-label="删除任务" type="button" onClick={() => applyTable({ ...table, rows: table.rows.filter((item) => item.id !== row.id) })}><Trash2 size={14} /></button></td></tr>)}</tbody>
             </table>
           </div>
@@ -236,5 +293,6 @@ export function HomePage(): React.JSX.Element {
 
 function TaskCell({ column, value, onChange }: { column: HomeTaskColumn; value: string; onChange(value: string): void }): React.JSX.Element {
   if (column.type === 'select') return <select aria-label={column.label} value={value} onChange={(event) => onChange(event.target.value)}><option value="">未设置</option>{column.options?.map((option) => <option key={option}>{option}</option>)}</select>
-  return <input aria-label={column.label} type={column.type === 'date' ? 'date' : 'text'} value={value} onChange={(event) => onChange(event.target.value)} />
+  if (column.type === 'date') return <input aria-label={column.label} type="date" value={value} onChange={(event) => onChange(event.target.value)} />
+  return <textarea aria-label={column.label} rows={1} value={value} onChange={(event) => onChange(event.target.value)} />
 }
