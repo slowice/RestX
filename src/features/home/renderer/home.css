@@ -40,6 +40,8 @@
 .home-column-resize:hover::after { background: #10a37f; }
 .home-task-table td { min-height: 44px; padding: 0; border-right: 1px solid #ededed; border-bottom: 1px solid #ededed; vertical-align: top; }
 .home-task-table tbody tr:hover { background: #fbfdfc; }
+.home-task-table tbody tr.home-task-row-completed { background: #eaf7f0; }
+.home-task-table tbody tr.home-task-row-completed:hover { background: #e0f3e9; }
 .home-task-table td input, .home-task-table td select, .home-task-table td textarea { width: 100%; min-height: 43px; padding: 0 10px; color: #222; border: 1px solid transparent; outline: none; background: transparent; font: inherit; font-size: var(--font-size-body); }
 .home-task-table td input, .home-task-table td select { height: 43px; }
 .home-task-table td textarea { display: block; field-sizing: content; padding-top: 12px; padding-bottom: 10px; overflow: hidden; resize: none; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
