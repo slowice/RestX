@@ -24,7 +24,7 @@ function installApi() {
 }
 
 function pasteBody(html: string, text: string): void {
-  fireEvent.paste(screen.getByLabelText('邮件正文'), {
+  fireEvent.paste(screen.getByLabelText('邮件正文', { selector: '[contenteditable="true"]' }), {
     clipboardData: { getData: (type: string) => type === 'text/html' ? html : type === 'text/plain' ? text : '' }
   })
 }
@@ -40,6 +40,35 @@ afterEach(() => {
 })
 
 describe('mail template reuse page', () => {
+  it('pastes formatted table HTML without adding blank rows in the editor or preview', () => {
+    const { container } = render(<MailTemplatePage />)
+    fireEvent.click(screen.getByRole('button', { name: '新建模板' }))
+    pasteBody('<table>\r\n<tbody>\r\n<tr><td>\r\n A\r\n</td><td>\r\n B\r\n</td></tr>\r\n<tr><td>\r\n C\r\n</td><td>\r\n D\r\n</td></tr>\r\n</tbody>\r\n</table>', 'A\tB\r\nC\tD')
+    for (const selector of ['.rich-mail-content', '.rich-preview']) {
+      const table = container.querySelector(`${selector} table`)!
+      expect(table).not.toBeNull()
+      expect(table.querySelectorAll('tr')).toHaveLength(2)
+      expect([...table.querySelectorAll('td')].map((cell) => cell.textContent)).toEqual(['A', 'B', 'C', 'D'])
+      expect(table.querySelectorAll('br')).toHaveLength(0)
+    }
+  })
+
+  it('preserves explicit cell line breaks, paragraphs, and intentionally empty rows', () => {
+    const { container } = render(<MailTemplatePage />)
+    fireEvent.click(screen.getByRole('button', { name: '新建模板' }))
+    pasteBody('<table><tr><td>第一行<br>第二行</td><td><p>第一段</p><p>第二段</p></td></tr><tr><td></td><td></td></tr></table>', '')
+    for (const selector of ['.rich-mail-content', '.rich-preview']) {
+      const table = container.querySelector(`${selector} table`)!
+      expect(table.querySelectorAll('tr')).toHaveLength(2)
+      const cells = table.querySelectorAll('td')
+      expect(cells[0].querySelectorAll('br')).toHaveLength(1)
+      expect(cells[0].textContent).toBe('第一行第二行')
+      expect([...cells[1].querySelectorAll('p')].map((p) => p.textContent)).toEqual(['第一段', '第二段'])
+      expect(cells[2].textContent).toBe('')
+      expect(cells[3].textContent).toBe('')
+    }
+  })
+
   it('uses defaults, applies per-send overrides, previews, and opens the same draft', async () => {
     const { openDraft } = installApi()
     render(<MailTemplatePage />)
@@ -111,7 +140,7 @@ describe('mail template reuse page', () => {
     fireEvent.click(screen.getByRole('button', { name: '导入 Outlook 邮件' }))
     await waitFor(() => expect(screen.getByLabelText('模板名称')).toHaveValue('客户月报'))
     expect(screen.getByDisplayValue('client@example.com')).toBeInTheDocument()
-    expect(screen.getByLabelText('邮件正文')).toHaveTextContent(/本月进度为 70%/)
+    expect(screen.getByLabelText('邮件正文', { selector: '[contenteditable="true"]' })).toHaveTextContent(/本月进度为 70%/)
     expect(screen.getByText('已导入 EML')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /客户月报.*客户月报/ })).not.toBeInTheDocument()
 
@@ -143,11 +172,11 @@ describe('mail template reuse page', () => {
   it('inserts and pastes editable tables in the rich body', () => {
     render(<MailTemplatePage />)
     fireEvent.click(screen.getByRole('button', { name: '插入表格' }))
-    expect(screen.getByLabelText('邮件正文').querySelector('table')).toBeInTheDocument()
+    expect(screen.getByLabelText('邮件正文', { selector: '[contenteditable="true"]' }).querySelector('table')).toBeInTheDocument()
 
     pasteBody('<table><tr><td style="background-color:#ffff00;border:1px solid #000000">Excel</td><td>70%</td></tr></table>', 'Excel\t70%')
     expect(screen.getByText('Excel 表格已按安全邮件格式粘贴。')).toBeInTheDocument()
-    expect(screen.getByLabelText('邮件正文').querySelectorAll('table').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByLabelText('邮件正文', { selector: '[contenteditable="true"]' }).querySelectorAll('table').length).toBeGreaterThanOrEqual(2)
   })
 
   it('expands editor and preview independently without losing rich body edits', () => {
@@ -156,7 +185,7 @@ describe('mail template reuse page', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '展开编辑区' }))
     expect(container.querySelector('.mail-template-page')).toHaveClass('is-focus-mode', 'mode-editor')
-    expect(screen.getByLabelText('邮件正文')).toHaveTextContent('专注模式表格')
+    expect(screen.getByLabelText('邮件正文', { selector: '[contenteditable="true"]' })).toHaveTextContent('专注模式表格')
 
     fireEvent.click(screen.getByRole('button', { name: '切换到预览区' }))
     expect(container.querySelector('.mail-template-page')).toHaveClass('mode-preview')
@@ -164,7 +193,7 @@ describe('mail template reuse page', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(container.querySelector('.mail-template-page')).not.toHaveClass('is-focus-mode')
     expect(container.querySelector('.mail-template-page')).toHaveClass('mode-normal')
-    expect(screen.getByLabelText('邮件正文')).toHaveTextContent('专注模式表格')
+    expect(screen.getByLabelText('邮件正文', { selector: '[contenteditable="true"]' })).toHaveTextContent('专注模式表格')
   })
 
   it('toggles adaptive display without writing scale styles into the mail body', () => {
@@ -176,7 +205,7 @@ describe('mail template reuse page', () => {
     fireEvent.click(autoButtons[0])
     expect(screen.getAllByRole('button', { name: '实际大小 100%' })).toHaveLength(2)
 
-    const editorBody = screen.getByLabelText('邮件正文')
+    const editorBody = screen.getByLabelText('邮件正文', { selector: '[contenteditable="true"]' })
     expect(editorBody.innerHTML).not.toMatch(/zoom|transform|mail-scale/i)
     expect(document.querySelector('.preview-body')?.innerHTML).not.toMatch(/zoom|transform|mail-scale/i)
   })
@@ -186,7 +215,7 @@ describe('mail template reuse page', () => {
     const html = '<html><head><style>td.xl65{border:.5pt solid windowtext;background:#fff2cc;text-align:center}td.xl66{border-top:1pt double #ff0000;border-right:.5pt solid windowtext;border-bottom:.5pt solid windowtext;border-left:.5pt solid windowtext}</style></head><body><table style="border-collapse:collapse"><tr><td class="xl65" colspan="2" rowspan="2">合并区域</td><td class="xl66">C1</td></tr><tr><td class="xl66">C2</td></tr></table></body></html>'
     pasteBody(html, '合并区域\t\tC1\n\t\tC2')
 
-    const editorMerged = screen.getByLabelText('邮件正文').querySelector('td[colspan="2"][rowspan="2"]') as HTMLTableCellElement | null
+    const editorMerged = screen.getByLabelText('邮件正文', { selector: '[contenteditable="true"]' }).querySelector('td[colspan="2"][rowspan="2"]') as HTMLTableCellElement | null
     expect(editorMerged).toBeInTheDocument()
     expect(editorMerged?.style.border).toMatch(/0\.5pt solid/)
 

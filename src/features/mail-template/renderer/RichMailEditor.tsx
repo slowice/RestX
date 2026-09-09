@@ -144,7 +144,8 @@ export function RichMailEditor({ value, onChange, onNotice, autoScale, layoutKey
         onNotice(table.message, 'error')
         return
       }
-      if (!editor.chain().focus().insertContent(table.html).run()) {
+      // Clipboard HTML indentation is formatting, not a line break in each cell.
+      if (!editor.chain().focus().insertContent(table.html, { parseOptions: { preserveWhitespace: false } }).run()) {
         onNotice('表格无法插入当前位置，正文未被修改。', 'error')
         return
       }
