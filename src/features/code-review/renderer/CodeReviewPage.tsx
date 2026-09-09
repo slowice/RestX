@@ -12,8 +12,10 @@ const categoryLabels: Record<ReviewCategory, string> = { security: '安全', bug
 const ruleCards = [
   { icon: ShieldAlert, name: '安全基线', detail: '注入、越权、敏感信息与危险 API' },
   { icon: Braces, name: '低级错误', detail: '空值、边界、异常、事务与并发' },
-  { icon: Layers3, name: '日志规范', detail: '敏感日志、级别、堆栈与重复打印' },
-  { icon: TestTube2, name: '仓库一致性', detail: 'Java、MyBatis、SQL 与 TypeScript 风格' }
+  { icon: Layers3, name: '日志规范', detail: '只打印脱敏描述，不打印异常堆栈' },
+  { icon: TestTube2, name: '通用检视准则', detail: '证据、需求、架构、性能与测试有效性' },
+  { icon: Code2, name: '语言专项', detail: 'Java、MyBatis、SQL 与 TypeScript' },
+  { icon: ShieldCheck, name: '自定义规则补全', detail: '低级代码错误、Java 具体异常、日志与 console 禁止堆栈' }
 ]
 
 export function CodeReviewPage(): React.JSX.Element {
@@ -149,7 +151,7 @@ export function CodeReviewPage(): React.JSX.Element {
           {zone === 'blue' && <button className="example-link" type="button" onClick={() => { setUrl('https://gitcode.com/OpenMatrix/MatrixAssistant/pull/1958'); resetOutput() }}>使用示例：MatrixAssistant #1958 <ArrowRight size={13} /></button>}
           {zone === 'yellow' && <div className="adapter-note"><LockKeyhole size={15} /><span>蓝区无法访问 CodeHub。进入黄区后只需补充 URL、认证和 diff 请求函数，页面与检视流程无需改动。</span></div>}
 
-          <div className="review-section-title second"><span>02</span><div><strong>检视要求</strong><small>安全基线不可关闭</small></div></div>
+          <div className="review-section-title second"><span>02</span><div><strong>检视要求</strong><small>通用、安全、日志及自定义规则始终启用；语言专项自动匹配</small></div></div>
           <div className="review-rule-grid">{ruleCards.map(({ icon: Icon, name, detail }) => <div key={name}><Icon size={15} /><span><b>{name}</b><small>{detail}</small></span><CheckCircle2 size={13} /></div>)}</div>
           <label className="review-field"><span>补充要求 <i>可选</i></span><textarea maxLength={8000} value={requirements} onChange={(event) => setRequirements(event.target.value)} placeholder="例如：重点检查批量更新、事务边界和敏感日志……" /></label>
           <button className="button primary review-primary-action" disabled={zone === 'yellow' || !url.trim() || status === 'loading' || status === 'reviewing'} onClick={() => void loadPreview()}>{status === 'loading' ? <LoaderCircle className="spin" size={16} /> : <Search size={16} />}{status === 'loading' ? '正在读取 PR…' : preview ? '重新读取变更' : '读取变更并预览'}</button>

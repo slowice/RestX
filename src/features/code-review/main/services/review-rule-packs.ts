@@ -4,6 +4,8 @@ import javaRules from '../presets/review-rules/java-mybatis-sql/RULES.md?raw'
 import loggingRules from '../presets/review-rules/logging/RULES.md?raw'
 import securityRules from '../presets/review-rules/security-baseline/RULES.md?raw'
 import typescriptRules from '../presets/review-rules/typescript-quality/RULES.md?raw'
+import baselineRules from '../presets/review-rules/review-baseline/RULES.md?raw'
+import customRules from '../presets/review-rules/custom-rule-completion/RULES.md?raw'
 
 const MAX_RULE_CHARACTERS = 30_000
 const CATEGORIES: ReviewCategory[] = ['security', 'bug', 'logging', 'consistency', 'test', 'maintainability']
@@ -28,7 +30,7 @@ function stringArray(value: unknown, field: string): string[] {
 
 export function parseReviewRulePack(markdown: string): ReviewRulePack {
   if (typeof markdown !== 'string' || markdown.length > MAX_RULE_CHARACTERS) throw new Error('规则包为空或超过大小限制。')
-  const match = /^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/.exec(markdown.trim())
+  const match = /^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/.exec(markdown.replace(/\r\n/g, '\n').trim())
   if (!match) throw new Error('规则包缺少 YAML frontmatter。')
   const metadata = parseYaml(match[1]) as Record<string, unknown>
   if (!metadata || typeof metadata !== 'object') throw new Error('规则包元数据无效。')
@@ -52,7 +54,7 @@ export function parseReviewRulePack(markdown: string): ReviewRulePack {
   }
 }
 
-const BUILTIN_RULES = [securityRules, javaRules, loggingRules, typescriptRules].map(parseReviewRulePack)
+const BUILTIN_RULES = [baselineRules, securityRules, javaRules, loggingRules, typescriptRules, customRules].map(parseReviewRulePack)
 
 const EXTENSION_LANGUAGE: Record<string, string> = {
   java: 'java', xml: 'xml', sql: 'sql', ts: 'typescript', tsx: 'tsx', js: 'javascript', jsx: 'jsx'
