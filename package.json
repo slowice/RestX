@@ -15,7 +15,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "dist:mac": "pnpm build && electron-builder --mac",
-    "dist:win": "pnpm build && electron-builder --win"
+    "dist:win": "pnpm build && electron-builder --win",
+    "package:win": "pnpm build && electron-builder --win nsis --x64 --publish never"
   },
   "dependencies": {
     "@kenjiuno/msgreader": "1.28.0",
