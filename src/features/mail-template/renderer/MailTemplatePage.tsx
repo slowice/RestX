@@ -101,9 +101,15 @@ export function MailTemplatePage(): React.JSX.Element {
     setWorkspaceMode(mode)
   }
 
-  const persist = (next: MailTemplate[]): void => {
-    setTemplates(next)
-    saveMailTemplates(localStorage, next)
+  const persist = (next: MailTemplate[]): boolean => {
+    try {
+      saveMailTemplates(localStorage, next)
+      setTemplates(next)
+      return true
+    } catch {
+      setNotice({ kind: 'error', text: '模板保存失败，可能是图片占用的存储空间过大。请缩小图片或清理不用的模板后重试，当前编辑内容已保留。' })
+      return false
+    }
   }
 
   const selectTemplate = (template: MailTemplate): void => {
@@ -136,8 +142,8 @@ export function MailTemplatePage(): React.JSX.Element {
         cc: imported.cc,
         bcc: imported.bcc,
         subject: imported.subject,
-        bodyHtml: plainTextToMailHtml(imported.body),
-        bodyText: imported.body
+        bodyHtml: imported.bodyHtml ?? plainTextToMailHtml(imported.body),
+        bodyText: imported.bodyHtml ? mailHtmlToText(imported.bodyHtml) : imported.body
       }
       setSelectedId(importedTemplate.id)
       setForm(toForm(importedTemplate))
@@ -165,7 +171,7 @@ export function MailTemplatePage(): React.JSX.Element {
     const next = templates.some((item) => item.id === template.id)
       ? templates.map((item) => item.id === template.id ? template : item)
       : [...templates, template]
-    persist(next)
+    if (!persist(next)) return
     setSelectedId(template.id)
     setForm(toForm(template))
     setNotice({ kind: 'success', text: `模板“${template.name}”已保存。` })
@@ -175,7 +181,7 @@ export function MailTemplatePage(): React.JSX.Element {
     const source = templates.find((template) => template.id === selectedId)
     if (!source) return
     const duplicate = duplicateMailTemplate(source)
-    persist([...templates, duplicate])
+    if (!persist([...templates, duplicate])) return
     setSelectedId(duplicate.id)
     setForm(toForm(duplicate))
     setPerSendJson('{}')
@@ -187,7 +193,7 @@ export function MailTemplatePage(): React.JSX.Element {
     const source = templates.find((template) => template.id === selectedId)
     if (!source || !window.confirm(`确定删除模板“${source.name}”吗？`)) return
     const next = templates.filter((template) => template.id !== source.id)
-    persist(next)
+    if (!persist(next)) return
     const replacement = next[0] ?? createBlankTemplate()
     setSelectedId(replacement.id)
     setForm(toForm(replacement))
@@ -346,7 +352,7 @@ export function MailTemplatePage(): React.JSX.Element {
                 <div className="preview-subject"><span>标题</span><strong>{highlightPlaceholders(rendered.draft.subject) || '（空）'}</strong></div>
               </div>
               <AdaptivePreviewBody
-                html={rendered.draft.bodyText ? highlightMissingVariables(rendered.draft.bodyHtml, rendered.missingVariables) : null}
+                html={rendered.draft.bodyText || rendered.draft.bodyHtml.includes('<img ') ? highlightMissingVariables(rendered.draft.bodyHtml, rendered.missingVariables) : null}
                 autoScale={scaleMode === 'auto'}
                 layoutKey={workspaceMode}
                 onScaleChange={setPreviewScale}

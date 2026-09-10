@@ -32,6 +32,7 @@ export type ImportedMailMessage = {
   bcc: string
   subject: string
   body: string
+  bodyHtml?: string
   attachmentCount: number
   warnings: string[]
 }
@@ -62,7 +63,7 @@ export const MAIL_TEMPLATE_LIMITS = {
   recipientCount: 100,
   subject: 998,
   body: 12_000,
-  bodyHtml: 240_000,
+  bodyHtml: 2_000_000,
   clipboardHtml: 4_000_000,
   tableRows: 500,
   tableColumns: 100,

@@ -1,10 +1,11 @@
 import { decodeHTML } from 'entities'
 import sanitizeHtml from 'sanitize-html'
+import { MAIL_TEMPLATE_LIMITS } from './contracts'
 
 const ALLOWED_TAGS = [
   'p', 'div', 'br', 'span', 'strong', 'b', 'em', 'i', 'u', 's', 'strike',
   'ul', 'ol', 'li', 'blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-  'table', 'colgroup', 'col', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'mark'
+  'table', 'colgroup', 'col', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'mark', 'img'
 ]
 
 const COLOR_VALUE = '(?:#[0-9a-f]{3,8}|rgba?\\(\\s*\\d{1,3}(?:\\s*,\\s*\\d{1,3}){2}(?:\\s*,\\s*(?:0|1|0?\\.\\d+))?\\s*\\)|[a-z]{1,24})'
@@ -22,7 +23,8 @@ const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
     col: ['style', 'width', 'span'],
     th: ['style', 'width', 'height', 'colspan', 'rowspan', 'colwidth'],
     td: ['style', 'width', 'height', 'colspan', 'rowspan', 'colwidth'],
-    mark: ['data-missing-variable']
+    mark: ['data-missing-variable'],
+    img: ['src', 'alt', 'title', 'width', 'height', 'style']
   },
   allowedStyles: {
     '*': {
@@ -60,6 +62,8 @@ const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
     }
   },
   allowedSchemes: [],
+  allowedSchemesByTag: { img: ['data'] },
+  exclusiveFilter: (frame) => frame.tag === 'img' && !isMailImageSource(frame.attribs.src ?? ''),
   allowProtocolRelative: false,
   disallowedTagsMode: 'discard',
   parseStyleAttributes: true,
@@ -75,6 +79,10 @@ const TEMPLATE_SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
 }
 
 export type SanitizedMailHtml = { html: string; changed: boolean }
+
+export function isMailImageSource(source: string): boolean {
+  return source.length <= MAIL_TEMPLATE_LIMITS.bodyHtml && /^data:image\/(?:png|jpeg|gif|webp);base64,[A-Za-z0-9+/]+={0,2}$/i.test(source)
+}
 
 export function sanitizeMailHtml(source: string): SanitizedMailHtml {
   return sanitizeWithOptions(source, SANITIZE_OPTIONS)

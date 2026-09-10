@@ -3,9 +3,11 @@ import { simpleParser, type AddressObject } from 'mailparser'
 import path from 'node:path'
 import { MAIL_TEMPLATE_LIMITS, type ImportedMailMessage } from '../shared/contracts'
 import { isValidEmailAddress } from '../shared/template-engine'
+import { mailHtmlToText } from '../shared/rich-body'
+import { importRichBody, type InlineMailImage } from './import-rich-body'
 
 type FileStat = { size: number; isFile(): boolean }
-type MsgReaderConstructor = new (arrayBuffer: ArrayBuffer | DataView) => { getFileData(): FieldsData }
+type MsgReaderConstructor = new (arrayBuffer: ArrayBuffer | DataView) => { getFileData(): FieldsData; getAttachment(attachment: FieldsData): { content: Uint8Array } }
 
 export type MessageImportDependencies = {
   selectFile(): Promise<string | null>
@@ -38,7 +40,11 @@ export async function parseOutlookMessage(buffer: Buffer, format: 'eml' | 'msg',
 }
 
 async function parseEmlMessage(buffer: Buffer, sourceName: string): Promise<ImportedMailMessage> {
-  const parsed = await simpleParser(buffer, { skipHtmlToText: true, skipTextToHtml: true })
+  const parsed = await simpleParser(buffer, { skipHtmlToText: true, skipTextToHtml: true, skipImageLinks: true })
+  const warnings: string[] = []
+  const bodyHtml = typeof parsed.html === 'string' ? importRichBody(parsed.html, parsed.attachments
+    .filter((attachment) => Boolean(attachment.contentId))
+    .map((attachment) => ({ id: attachment.contentId!, content: attachment.content, contentType: attachment.contentType })), warnings) : undefined
   const body = cleanText(parsed.text || (typeof parsed.html === 'string' ? htmlToPlainText(parsed.html) : ''))
   return finalizeImportedMessage({
     sourceName,
@@ -48,17 +54,27 @@ async function parseEmlMessage(buffer: Buffer, sourceName: string): Promise<Impo
     bcc: formatEmlAddresses(parsed.bcc),
     subject: parsed.subject ?? '',
     body,
+    bodyHtml,
     attachmentCount: parsed.attachments.length,
-    warnings: []
+    warnings
   })
 }
 
 function parseMsgMessage(buffer: Buffer, sourceName: string): ImportedMailMessage {
   const arrayBuffer = Uint8Array.from(buffer).buffer
   const MessageReader = resolveMsgReaderConstructor(MsgReader)
-  const fields = new MessageReader(arrayBuffer).getFileData()
+  const reader = new MessageReader(arrayBuffer)
+  const fields = reader.getFileData()
   if (fields.error) throw new Error('导入失败：MSG 文件内容无效。')
-  return normalizeMsgFields(fields, sourceName)
+  const images: InlineMailImage[] = []
+  for (const attachment of fields.attachments ?? []) {
+    if (!attachment.pidContentId) continue
+    try {
+      images.push({ id: attachment.pidContentId, content: reader.getAttachment(attachment).content,
+        contentType: attachment.attachMimeTag ?? imageMimeType(attachment.fileName ?? '') })
+    } catch { /* Missing image data is reported when resolving the HTML reference. */ }
+  }
+  return normalizeMsgFields(fields, sourceName, images)
 }
 
 export function resolveMsgReaderConstructor(value: unknown): MsgReaderConstructor {
@@ -69,9 +85,11 @@ export function resolveMsgReaderConstructor(value: unknown): MsgReaderConstructo
   throw new Error('导入失败：MSG 解析组件加载失败。')
 }
 
-export function normalizeMsgFields(fields: FieldsData, sourceName: string): ImportedMailMessage {
+export function normalizeMsgFields(fields: FieldsData, sourceName: string, images: InlineMailImage[] = []): ImportedMailMessage {
   const recipients = fields.recipients ?? []
-  const html = fields.bodyHtml ?? (fields.html ? Buffer.from(fields.html).toString('utf8') : '')
+  const html = fields.bodyHtml ?? decodeMsgHtml(fields)
+  const warnings: string[] = []
+  const bodyHtml = html ? importRichBody(html, images, warnings) : undefined
   const body = cleanText(fields.body || (html ? htmlToPlainText(html) : ''))
   return finalizeImportedMessage({
     sourceName,
@@ -81,8 +99,9 @@ export function normalizeMsgFields(fields: FieldsData, sourceName: string): Impo
     bcc: formatMsgRecipients(recipients, 'bcc'),
     subject: fields.subject ?? '',
     body,
+    bodyHtml,
     attachmentCount: fields.attachments?.length ?? 0,
-    warnings: []
+    warnings
   })
 }
 
@@ -95,11 +114,11 @@ function finalizeImportedMessage(message: ImportedMailMessage): ImportedMailMess
     cc: truncate(message.cc, MAIL_TEMPLATE_LIMITS.recipientField, '抄送', warnings),
     bcc: truncate(message.bcc, MAIL_TEMPLATE_LIMITS.recipientField, '密送', warnings),
     subject: truncate(cleanLine(message.subject), MAIL_TEMPLATE_LIMITS.subject, '标题', warnings),
-    body: truncate(cleanText(message.body), MAIL_TEMPLATE_LIMITS.body, '正文', warnings),
+    body: truncate(message.bodyHtml ? mailHtmlToText(message.bodyHtml) : cleanText(message.body), MAIL_TEMPLATE_LIMITS.body, '正文', warnings),
     warnings
   }
-  if (!result.subject && !result.body) throw new Error('导入失败：邮件中没有可用的标题或正文。')
-  if (result.attachmentCount > 0) warnings.push(`检测到 ${result.attachmentCount} 个附件，本次只导入邮件文字内容。`)
+  if (!result.subject && !result.body && !result.bodyHtml?.includes('<img ')) throw new Error('导入失败：邮件中没有可用的标题或正文。')
+  if (result.attachmentCount > 0) warnings.push(`检测到 ${result.attachmentCount} 个附件，已尝试导入正文引用的内嵌图片，独立附件不随模板保存。`)
   if (!result.to) warnings.push('没有识别到可用的收件人邮箱，请在保存前补充。')
   return result
 }
@@ -109,6 +128,21 @@ function readFormat(filePath: string): 'eml' | 'msg' {
   if (extension === '.eml') return 'eml'
   if (extension === '.msg') return 'msg'
   throw new Error('仅支持 Outlook 导出的 .eml 或 .msg 文件。')
+}
+
+function imageMimeType(fileName: string): string {
+  const extension = path.extname(fileName).toLowerCase()
+  return ({ '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' } as Record<string, string>)[extension] ?? ''
+}
+
+function decodeMsgHtml(fields: FieldsData): string {
+  if (!fields.html) return ''
+  const bytes = fields.html
+  const header = Buffer.from(bytes).subarray(0, 2048).toString('ascii')
+  const charset = header.match(/charset\s*=\s*["']?\s*([\w-]+)/i)?.[1]
+  const codepages: Record<number, string> = { 65001: 'utf-8', 1200: 'utf-16le', 936: 'gbk', 950: 'big5', 932: 'shift_jis' }
+  try { return new TextDecoder(charset ?? codepages[fields.internetCodepage ?? 65001] ?? `windows-${fields.internetCodepage}`).decode(bytes) }
+  catch { return Buffer.from(bytes).toString('utf8') }
 }
 
 function formatEmlAddresses(value: AddressObject | AddressObject[] | undefined): string {

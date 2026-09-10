@@ -5,6 +5,7 @@ import TextAlign from '@tiptap/extension-text-align'
 import { BackgroundColor, Color, FontFamily, FontSize, TextStyle } from '@tiptap/extension-text-style'
 import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table'
 import { normalizeClipboardTable } from './excel-paste'
+import { MailImage } from './mail-image'
 import { suggestRowAlias, VARIABLE_ALIAS_PATTERN, VARIABLE_PATH_PATTERN } from './dynamic-rows'
 import { sanitizeMailHtml, sanitizeMailStyle, sanitizeMailTemplateHtml } from '../shared/rich-body'
 import { useAdaptiveMailScale } from './use-adaptive-mail-scale'
@@ -66,6 +67,7 @@ export function RichMailEditor({ value, onChange, onNotice, autoScale, layoutKey
   const editor = useEditor({
     extensions: [
       StarterKit,
+      MailImage,
       TextStyle,
       Color,
       BackgroundColor,

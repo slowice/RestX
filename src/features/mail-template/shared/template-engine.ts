@@ -126,7 +126,7 @@ export function validateMailDraft(draft: MailDraft): MailValidationIssue[] {
   const sanitized = sanitizeMailHtml(draft.bodyHtml)
   if (sanitized.changed) issues.push({ code: 'unsafe-html', field: 'body', message: '邮件正文包含不受支持或不安全的格式。' })
   if (mailHtmlToText(sanitized.html) !== draft.bodyText) issues.push({ code: 'body-text-mismatch', field: 'body', message: '邮件正文的纯文本内容与富文本不一致。' })
-  if (!draft.bodyText.trim()) issues.push({ code: 'empty-body', field: 'body', message: '邮件正文不能为空。' })
+  if (!draft.bodyText.trim() && !sanitized.html.includes('<img ')) issues.push({ code: 'empty-body', field: 'body', message: '邮件正文不能为空。' })
   if (draft.subject.length > MAIL_TEMPLATE_LIMITS.subject) issues.push({ code: 'field-too-long', field: 'subject', message: `邮件标题不能超过 ${MAIL_TEMPLATE_LIMITS.subject} 个字符。` })
   if (draft.bodyText.length > MAIL_TEMPLATE_LIMITS.body || draft.bodyHtml.length > MAIL_TEMPLATE_LIMITS.bodyHtml) issues.push({ code: 'field-too-long', field: 'body', message: '邮件正文内容过长。' })
   return issues
@@ -140,7 +140,7 @@ export function validateMailTemplate(template: MailTemplate): string[] {
   if (!template.subject.trim()) errors.push('标题模板不能为空。')
   const sanitized = sanitizeMailTemplateHtml(template.bodyHtml)
   if (sanitized.changed) errors.push('正文模板包含不受支持或不安全的格式。')
-  if (!template.bodyText.trim()) errors.push('正文模板不能为空。')
+  if (!template.bodyText.trim() && !sanitized.html.includes('<img ')) errors.push('正文模板不能为空。')
   if (mailHtmlToText(sanitized.html) !== template.bodyText) errors.push('正文模板的纯文本内容与富文本不一致。')
   for (const [label, value] of [['收件人', template.to], ['抄送', template.cc], ['密送', template.bcc]] as const) {
     if (value.length > MAIL_TEMPLATE_LIMITS.recipientField) errors.push(`${label}内容过长。`)

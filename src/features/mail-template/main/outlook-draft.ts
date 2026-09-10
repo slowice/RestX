@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import type { MailDraft } from '../shared/contracts'
 import { readMailDraft } from '../shared/template-engine'
 import { findClassicOutlookPath } from './classic-outlook'
+import { prepareOutlookBody } from './outlook-body'
 import {
   formatMailLaunchTimestamp,
   mailLaunchLogger,
@@ -94,11 +95,22 @@ export async function openClassicOutlookDraft(input: unknown, dependencies: Outl
   const payloadPath = join(directory, 'draft.json')
   try {
     await dependencies.writeFile(scriptPath, OUTLOOK_DRAFT_SCRIPT)
-    await dependencies.writeFile(payloadPath, JSON.stringify(serializeDraft(draft)))
+    const payload = serializeDraft(draft)
+    await dependencies.writeFile(payloadPath, JSON.stringify(payload))
+    // Temporary diagnostics for the Outlook border development handoff.
+    await dependencies.writeLog({
+      stage: 'prepare', outcome: 'success', marker: '[mail-template][R01-01]',
+      tableStyles: {
+        implementation: 'inline-table-borders-v1',
+        tables: (payload.bodyHtml.match(/<table\b/gi) ?? []).length,
+        cells: (payload.bodyHtml.match(/<t[dh]\b/gi) ?? []).length,
+        cellsWithBorder: (payload.bodyHtml.match(/<t[dh]\b[^>]*\bstyle="[^"]*\bborder:/gi) ?? []).length
+      }
+    }).catch(() => undefined)
     const result = await dependencies.runPowerShell(scriptPath, payloadPath, OUTLOOK_TIMEOUT_MS)
     if (result.timedOut) throw new Error('打开经典 Outlook 超时，请复制富文本正文后手动粘贴。')
     if (result.code === 0 && result.stdout.includes(READY_MARKER)) {
-      await dependencies.writeLog({ stage: 'launch', outcome: 'success', outlookPath }).catch(() => undefined)
+      await dependencies.writeLog({ stage: 'launch', outcome: 'success', outlookPath, marker: '[mail-template][R01-02]' }).catch(() => undefined)
       return
     }
     if (result.stderr.includes('RESTX_OUTLOOK_UNAVAILABLE')) throw new Error('未找到可用的 Windows 经典 Outlook，请确认已安装并完成首次启动。')
@@ -107,7 +119,7 @@ export async function openClassicOutlookDraft(input: unknown, dependencies: Outl
     throw new Error('经典 Outlook 无法创建邮件草稿，请复制富文本正文后手动粘贴。')
   } catch (reason) {
     await dependencies.writeLog({
-      stage: 'launch', outcome: 'failure', code: 'OUTLOOK_LAUNCH_FAILED', outlookPath,
+      stage: 'launch', outcome: 'failure', code: 'OUTLOOK_LAUNCH_FAILED', outlookPath, marker: '[mail-template][R01-03]',
       error: summarizeMailLaunchError(reason)
     }).catch(() => undefined)
     throw reason
@@ -117,7 +129,7 @@ export async function openClassicOutlookDraft(input: unknown, dependencies: Outl
 }
 
 export function serializeDraft(draft: MailDraft): Pick<MailDraft, 'to' | 'cc' | 'bcc' | 'subject' | 'bodyHtml'> {
-  return { to: draft.to, cc: draft.cc, bcc: draft.bcc, subject: draft.subject, bodyHtml: draft.bodyHtml }
+  return { to: draft.to, cc: draft.cc, bcc: draft.bcc, subject: draft.subject, bodyHtml: prepareOutlookBody(draft.bodyHtml) }
 }
 
 function runPowerShell(scriptPath: string, payloadPath: string, timeoutMs: number): Promise<ProcessResult> {
