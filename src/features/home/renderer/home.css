@@ -46,6 +46,9 @@
 .home-task-table td input, .home-task-table td select { height: 43px; }
 .home-task-table td textarea { display: block; field-sizing: content; padding-top: 12px; padding-bottom: 10px; overflow: hidden; resize: none; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .home-task-table td input:focus, .home-task-table td select:focus, .home-task-table td textarea:focus { border-color: #10a37f; background: #fff; box-shadow: inset 0 0 0 1px #10a37f; }
+.home-task-table td select[data-priority='高'] { color: #b42318; background: #fff1f0; font-weight: 650; }
+.home-task-table td select[data-priority='低'] { color: #175cd3; background: #eff8ff; font-weight: 650; }
+.home-task-table td select[data-priority] option { color: #222; background: #fff; font-weight: 400; }
 .home-row-actions-head, .home-row-actions { width: 58px; min-width: 58px !important; text-align: center !important; }
 .home-row-actions button { margin: 0 auto; }
 .home-table-card footer { display: flex; gap: 14px; padding: 10px 13px; color: #777; background: #fafafa; font-size: var(--font-size-meta); }

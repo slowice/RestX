@@ -292,7 +292,7 @@ export function HomePage(): React.JSX.Element {
 }
 
 function TaskCell({ column, value, onChange }: { column: HomeTaskColumn; value: string; onChange(value: string): void }): React.JSX.Element {
-  if (column.type === 'select') return <select aria-label={column.label} value={value} onChange={(event) => onChange(event.target.value)}><option value="">未设置</option>{column.options?.map((option) => <option key={option}>{option}</option>)}</select>
+  if (column.type === 'select') return <select aria-label={column.label} data-priority={column.id === 'priority' ? value : undefined} value={value} onChange={(event) => onChange(event.target.value)}><option value="">未设置</option>{column.options?.map((option) => <option key={option}>{option}</option>)}</select>
   if (column.type === 'date') return <input aria-label={column.label} type="date" value={value} onChange={(event) => onChange(event.target.value)} />
   return <textarea aria-label={column.label} rows={1} value={value} onChange={(event) => onChange(event.target.value)} />
 }
