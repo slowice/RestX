@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { AlertTriangle, ArrowRight, Bot, Braces, CheckCircle2, ChevronRight, CircleDot, Code2, FileCode2, FileSearch, GitPullRequest, KeyRound, Layers3, LoaderCircle, LockKeyhole, RefreshCw, Search, ShieldAlert, ShieldCheck, Sparkles, TestTube2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { CodeReviewResult, GitCodeMergeRequestList, GitCodeMergeRequestSummary, MergeRequestReviewState, ReviewCategory, ReviewFinding, ReviewSeverity, ReviewSourcePreview, ReviewZone } from '../shared/contracts/code-review'
 import { PageHeader } from '../../../platform/renderer/components/PageHeader'
+import { chooseZone, loadMyMergeRequests, loadPreview, runReview, selectMergeRequest, setCategory, setRequirements, setSeverity, setUrl, useReviewSession } from './review-session'
 import './code-review.css'
-
-type PageStatus = 'idle' | 'loading' | 'ready' | 'reviewing' | 'completed' | 'error'
 
 const severityLabels: Record<ReviewSeverity, string> = { P0: '致命', P1: '高风险', P2: '建议修复', P3: '优化建议' }
 const categoryLabels: Record<ReviewCategory, string> = { security: '安全', bug: '低级错误', logging: '日志', consistency: '一致性', test: '测试', maintainability: '可维护性' }
@@ -19,85 +18,13 @@ const ruleCards = [
 ]
 
 export function CodeReviewPage(): React.JSX.Element {
-  const [zone, setZone] = useState<ReviewZone>('blue')
-  const [url, setUrl] = useState('')
-  const [requirements, setRequirements] = useState('')
-  const [status, setStatus] = useState<PageStatus>('idle')
-  const [preview, setPreview] = useState<ReviewSourcePreview | null>(null)
-  const [result, setResult] = useState<CodeReviewResult | null>(null)
-  const [error, setError] = useState('')
-  const [severity, setSeverity] = useState<ReviewSeverity | 'all'>('all')
-  const [category, setCategory] = useState<ReviewCategory | 'all'>('all')
-  const [mergeRequestList, setMergeRequestList] = useState<GitCodeMergeRequestList | null>(null)
-  const [mergeRequestListStatus, setMergeRequestListStatus] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [mergeRequestListError, setMergeRequestListError] = useState('')
-
-  const loadMyMergeRequests = useCallback(async (): Promise<void> => {
-    setMergeRequestListStatus('loading')
-    setMergeRequestListError('')
-    try {
-      const next = await window.restx.codeReview.listMyGitCodeMergeRequests()
-      setMergeRequestList(next)
-      setMergeRequestListStatus('ready')
-    } catch (reason) {
-      setMergeRequestListError(errorMessage(reason))
-      setMergeRequestListStatus('error')
-    }
-  }, [])
+  const { zone, url, requirements, status, preview, result, error, severity, category,
+    mergeRequestList, mergeRequestListStatus, mergeRequestListError } = useReviewSession()
+  const busy = status === 'loading' || status === 'reviewing'
 
   useEffect(() => {
     if (zone === 'blue') void loadMyMergeRequests()
-  }, [loadMyMergeRequests, zone])
-
-  const resetOutput = (): void => {
-    setPreview(null)
-    setResult(null)
-    setError('')
-    setStatus('idle')
-  }
-
-  const chooseZone = (next: ReviewZone): void => {
-    if (next === zone) return
-    setZone(next)
-    setUrl('')
-    resetOutput()
-  }
-
-  const loadPreview = async (sourceUrl = url.trim()): Promise<void> => {
-    if (!sourceUrl) return
-    setStatus('loading')
-    setError('')
-    setPreview(null)
-    setResult(null)
-    try {
-      const next = await window.restx.codeReview.previewSource({ url: sourceUrl, zone })
-      setPreview(next)
-      setStatus('ready')
-    } catch (reason) {
-      setError(errorMessage(reason))
-      setStatus('error')
-    }
-  }
-
-  const runReview = async (force = false): Promise<void> => {
-    if (!preview) return
-    setStatus('reviewing')
-    setError('')
-    try {
-      const next = await window.restx.codeReview.run({ url: url.trim(), zone, requirements: requirements.trim(), force })
-      setResult(next)
-      setMergeRequestList((current) => current ? {
-        ...current,
-        mergeRequests: current.mergeRequests.map((mergeRequest) => mergeRequest.sourceId === next.sourceId
-          ? { ...mergeRequest, review: { status: next.findings.length ? 'issues' : 'passed', findingCount: next.findings.length, analyzedAt: next.analyzedAt } }
-          : mergeRequest)
-      } : current)
-      setStatus('completed')
-    } catch (reason) {
-      setError(errorMessage(reason))
-      setStatus('error')
-    }
-  }
+  }, [zone])
 
   const filteredFindings = useMemo(() => (result?.findings ?? []).filter((finding) =>
     (severity === 'all' || finding.severity === severity) && (category === 'all' || finding.category === category)
@@ -110,22 +37,15 @@ export function CodeReviewPage(): React.JSX.Element {
     P3: result?.findings.filter((item) => item.severity === 'P3').length ?? 0
   }), [result])
 
-  const selectMergeRequest = (mergeRequest: GitCodeMergeRequestSummary): void => {
-    const selectedUrl = mergeRequest.locator.webUrl
-    setUrl(selectedUrl)
-    resetOutput()
-    void loadPreview(selectedUrl)
-  }
-
   return (
     <div className="page code-review-page">
       <PageHeader eyebrow="AI CODE REVIEW" title="代码自检" description="在提交前检查 AI 生成代码的安全、低级错误、日志和仓库一致性。代码来源与模型区域由主进程强制匹配。" />
 
       <section className="review-zone-switch" aria-label="网络区域">
-        <button className={`zone-option blue${zone === 'blue' ? ' active' : ''}`} onClick={() => chooseZone('blue')}>
+        <button className={`zone-option blue${zone === 'blue' ? ' active' : ''}`} disabled={busy} onClick={() => chooseZone('blue')}>
           <span className="zone-icon"><ShieldCheck size={20} /></span><span><b>蓝区 · 开放区</b><small>GitCode · 蓝区 AI</small></span>{zone === 'blue' && <CheckCircle2 size={17} />}
         </button>
-        <button className={`zone-option yellow${zone === 'yellow' ? ' active' : ''}`} onClick={() => chooseZone('yellow')}>
+        <button className={`zone-option yellow${zone === 'yellow' ? ' active' : ''}`} disabled={busy} onClick={() => chooseZone('yellow')}>
           <span className="zone-icon"><LockKeyhole size={20} /></span><span><b>黄区 · 代码保密区</b><small>CodeHub · 内部 AI · 禁止降级</small></span>{zone === 'yellow' && <CheckCircle2 size={17} />}
         </button>
         <div className={`zone-policy ${zone}`}><CircleDot size={14} /><span>{zone === 'blue' ? '当前只允许 GitCode 来源发送到蓝区模型' : '黄区代码只能发送到黄区内部模型'}</span></div>
@@ -144,16 +64,17 @@ export function CodeReviewPage(): React.JSX.Element {
             status={mergeRequestListStatus}
             error={mergeRequestListError}
             selectedUrl={url}
+            disabled={busy}
             onRefresh={() => void loadMyMergeRequests()}
             onSelect={selectMergeRequest}
           />}
-          <label className="review-field"><span>{zone === 'blue' ? '或者手动粘贴链接' : 'MR / PR 链接'}</span><div className="review-url-input"><GitPullRequest size={16} /><input type="url" value={url} disabled={zone === 'yellow'} onChange={(event) => { setUrl(event.target.value); resetOutput() }} placeholder={zone === 'blue' ? 'https://gitcode.com/owner/repo/pull/123' : '进入黄区后配置 CodeHub 域名'} /></div></label>
-          {zone === 'blue' && <button className="example-link" type="button" onClick={() => { setUrl('https://gitcode.com/OpenMatrix/MatrixAssistant/pull/1958'); resetOutput() }}>使用示例：MatrixAssistant #1958 <ArrowRight size={13} /></button>}
+          <label className="review-field"><span>{zone === 'blue' ? '或者手动粘贴链接' : 'MR / PR 链接'}</span><div className="review-url-input"><GitPullRequest size={16} /><input type="url" value={url} disabled={zone === 'yellow' || busy} onChange={(event) => setUrl(event.target.value)} placeholder={zone === 'blue' ? 'https://gitcode.com/owner/repo/pull/123' : '进入黄区后配置 CodeHub 域名'} /></div></label>
+          {zone === 'blue' && <button className="example-link" type="button" disabled={busy} onClick={() => setUrl('https://gitcode.com/OpenMatrix/MatrixAssistant/pull/1958')}>使用示例：MatrixAssistant #1958 <ArrowRight size={13} /></button>}
           {zone === 'yellow' && <div className="adapter-note"><LockKeyhole size={15} /><span>蓝区无法访问 CodeHub。进入黄区后只需补充 URL、认证和 diff 请求函数，页面与检视流程无需改动。</span></div>}
 
           <div className="review-section-title second"><span>02</span><div><strong>检视要求</strong><small>通用、安全、日志及自定义规则始终启用；语言专项自动匹配</small></div></div>
           <div className="review-rule-grid">{ruleCards.map(({ icon: Icon, name, detail }) => <div key={name}><Icon size={15} /><span><b>{name}</b><small>{detail}</small></span><CheckCircle2 size={13} /></div>)}</div>
-          <label className="review-field"><span>补充要求 <i>可选</i></span><textarea maxLength={8000} value={requirements} onChange={(event) => setRequirements(event.target.value)} placeholder="例如：重点检查批量更新、事务边界和敏感日志……" /></label>
+          <label className="review-field"><span>补充要求 <i>可选</i></span><textarea maxLength={8000} disabled={busy} value={requirements} onChange={(event) => setRequirements(event.target.value)} placeholder="例如：重点检查批量更新、事务边界和敏感日志……" /></label>
           <button className="button primary review-primary-action" disabled={zone === 'yellow' || !url.trim() || status === 'loading' || status === 'reviewing'} onClick={() => void loadPreview()}>{status === 'loading' ? <LoaderCircle className="spin" size={16} /> : <Search size={16} />}{status === 'loading' ? '正在读取 PR…' : preview ? '重新读取变更' : '读取变更并预览'}</button>
           <div className="review-readonly"><ShieldCheck size={14} /><span>只读访问 · 不 fetch · 不执行仓库脚本 · 不回写评论</span></div>
         </aside>
@@ -171,11 +92,12 @@ export function CodeReviewPage(): React.JSX.Element {
   )
 }
 
-function MyMergeRequests({ data, status, error, selectedUrl, onRefresh, onSelect }: {
+function MyMergeRequests({ data, status, error, selectedUrl, disabled, onRefresh, onSelect }: {
   data: GitCodeMergeRequestList | null
   status: 'loading' | 'ready' | 'error'
   error: string
   selectedUrl: string
+  disabled: boolean
   onRefresh: () => void
   onSelect: (mergeRequest: GitCodeMergeRequestSummary) => void
 }): React.JSX.Element {
@@ -191,6 +113,7 @@ function MyMergeRequests({ data, status, error, selectedUrl, onRefresh, onSelect
           type="button"
           aria-pressed={selectedUrl === mergeRequest.locator.webUrl}
           key={mergeRequest.sourceId}
+          disabled={disabled}
           onClick={() => onSelect(mergeRequest)}
         >
           <span className="mr-choice-main"><b>{mergeRequest.locator.owner}/{mergeRequest.locator.repository} #{mergeRequest.locator.number}</b><strong>{mergeRequest.draft ? '[草稿] ' : ''}{mergeRequest.title}</strong><small>{mergeRequest.headBranch} → {mergeRequest.baseBranch}{mergeRequest.updatedAt ? ` · ${formatDateTime(mergeRequest.updatedAt)}` : ''}</small></span>
@@ -225,7 +148,7 @@ function ReviewWelcome({ zone }: { zone: ReviewZone }): React.JSX.Element {
 }
 
 function ReviewLoading({ text }: { text: string }): React.JSX.Element {
-  return <div className="review-loading"><div className="loading-rings"><Bot size={29} /><i /><i /></div><h2>代码自检处理中</h2><p>{text}</p><div className="review-progress"><span /></div><small>大型 PR 会按文件分批处理，请保持窗口打开</small></div>
+  return <div className="review-loading"><div className="loading-rings"><Bot size={29} /><i /><i /></div><h2>代码自检处理中</h2><p>{text}</p><div className="review-progress"><span /></div><small>可切换到其他页面，返回后继续查看；请勿关闭或刷新应用</small></div>
 }
 
 function ReviewError({ message, hasPreview, onRetry }: { message: string; hasPreview: boolean; onRetry: () => void }): React.JSX.Element {
@@ -250,4 +173,3 @@ function statusLabel(status: ReviewSourcePreview['files'][number]['status']): st
 function confidenceLabel(value: ReviewFinding['confidence']): string { return ({ high: '高', medium: '中', low: '低' })[value] }
 function formatCharacters(value: number): string { return value >= 1000 ? `${(value / 1000).toFixed(1)}K` : String(value) }
 function formatDateTime(value: string): string { const time = Date.parse(value); return Number.isFinite(time) ? new Date(time).toLocaleDateString() : value }
-function errorMessage(reason: unknown): string { return reason instanceof Error ? reason.message.replace(/^Error invoking remote method '[^']+': Error: /, '') : '操作失败，请稍后重试。' }
