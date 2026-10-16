@@ -38,6 +38,7 @@ export type HomeTaskRow = {
   cells: Record<string, string>
   createdAt: string
   updatedAt: string
+  archiveMonth?: string
 }
 
 export type HomeTaskTable = {

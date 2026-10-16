@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertCircle, CalendarDays, Columns3, ListTodo, LockKeyhole, LogIn, Plus, Search, Trash2, UserRound } from 'lucide-react'
+import { Archive, ArchiveRestore, ArrowLeft, AlertCircle, CalendarDays, Columns3, ListTodo, LockKeyhole, LogIn, Plus, Search, Trash2, UserRound } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { formatArchiveMonth, getTaskArchiveMonth } from '../shared/task-archive'
 import { PageHeader } from '../../../platform/renderer/components/PageHeader'
 import {
   getDefaultHomeTaskColumnWidth,
@@ -35,6 +37,9 @@ function newRow(columns: HomeTaskColumn[]): HomeTaskRow {
 }
 
 export function HomePage(): React.JSX.Element {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const archiveView = searchParams.get('view') === 'archive'
+  const [monthFilter, setMonthFilter] = useState('')
   const [loginState, setLoginState] = useState<HomeLoginState | null>(null)
   const [account, setAccount] = useState('')
   const [password, setPassword] = useState('')
@@ -132,13 +137,18 @@ export function HomePage(): React.JSX.Element {
     }
   }
 
-  function applyTable(next: HomeTaskTable): void {
+  function applyTable(next: HomeTaskTable, immediate = false): void {
     tableRef.current = next
     setTable(next)
     setTableError(null)
     const revision = ++revisionRef.current
     setSaveStatus('pending')
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    if (immediate) {
+      saveTimerRef.current = null
+      void persistTable(next, revision)
+      return
+    }
     saveTimerRef.current = setTimeout(() => {
       saveTimerRef.current = null
       void persistTable(next, revision)
@@ -225,16 +235,67 @@ export function HomePage(): React.JSX.Element {
     })
   }
 
+  function setArchived(rowId: string, archived: boolean): void {
+    const current = tableRef.current
+    if (!current) return
+    applyTable({
+      ...current,
+      rows: current.rows.map((row) => {
+        if (row.id !== rowId) return row
+        const next = { ...row, updatedAt: new Date().toISOString() }
+        if (archived) next.archiveMonth = getTaskArchiveMonth(row)
+        else delete next.archiveMonth
+        return next
+      })
+    }, true)
+  }
+
+  function switchView(): void {
+    setSearch('')
+    setDateFilter('')
+    setStatusFilter('')
+    setMonthFilter('')
+    setSearchParams(archiveView ? {} : { view: 'archive' })
+  }
+
+  const activeCount = table?.rows.filter((row) => !row.archiveMonth).length ?? 0
+  const archiveCount = (table?.rows.length ?? 0) - activeCount
+  const archiveMonths = useMemo(() => [...new Set(table?.rows.flatMap((row) => row.archiveMonth ? [row.archiveMonth] : []) ?? [])].sort().reverse(), [table])
   const visibleRows = useMemo(() => {
     if (!table) return []
     const query = search.trim().toLocaleLowerCase()
     return table.rows.filter((row) => {
+      if (Boolean(row.archiveMonth) !== archiveView) return false
+      if (archiveView && monthFilter && row.archiveMonth !== monthFilter) return false
       if (query && !Object.values(row.cells).some((value) => value.toLocaleLowerCase().includes(query))) return false
       if (dateFilter && row.cells.date !== dateFilter) return false
       if (statusFilter && row.cells.status !== statusFilter) return false
       return true
     })
-  }, [table, search, dateFilter, statusFilter])
+  }, [table, search, dateFilter, statusFilter, archiveView, monthFilter])
+  const archiveGroups = useMemo(() => {
+    const groups = new Map<string, HomeTaskRow[]>()
+    for (const row of visibleRows) {
+      if (!row.archiveMonth) continue
+      const group = groups.get(row.archiveMonth) ?? []
+      group.push(row)
+      groups.set(row.archiveMonth, group)
+    }
+    return [...groups.entries()].sort(([left], [right]) => right.localeCompare(left))
+  }, [visibleRows])
+
+  function renderTable(rows: HomeTaskRow[]): React.JSX.Element | null {
+    if (!table) return null
+    return (
+      <div className="home-table-scroll">
+        <table className="home-task-table" style={{ width: table.columns.reduce((sum, column) => sum + columnWidth(column), 126) }}>
+          <colgroup>{table.columns.map((column) => <col key={column.id} style={{ width: columnWidth(column) }} />)}<col style={{ width: 126 }} /></colgroup>
+          <thead><tr>{table.columns.map((column) => <th key={column.id}>{archiveView ? column.label : <><div className="home-column-head"><input aria-label={`列名：${column.label}`} maxLength={80} value={column.label} onChange={(event) => renameColumn(column.id, event.target.value)} /><button aria-label={`删除${column.label}列`} disabled={table.columns.length === 1} type="button" onClick={() => removeColumn(column)}><Trash2 size={13} /></button></div><span className="home-column-resize" role="separator" aria-label={`调整${column.label}列宽`} onPointerDown={(event) => beginColumnResize(event, column)} /></>}</th>)}<th className="home-row-actions-head">操作</th></tr></thead>
+          <tbody>{rows.map((row) => <tr key={row.id} className={row.cells.status === '完成' ? 'home-task-row-completed' : undefined}>{table.columns.map((column) => <td key={column.id}>{archiveView ? <div className="home-archive-cell">{row.cells[column.id] || '—'}</div> : <TaskCell column={column} value={row.cells[column.id] ?? ''} onChange={(value) => updateCell(row.id, column.id, value)} />}</td>)}<td className="home-row-actions"><div className="home-row-action-buttons">{archiveView ? <button className="home-archive-action" aria-label="恢复到首页" title="恢复到首页" type="button" onClick={() => setArchived(row.id, false)}><ArchiveRestore size={14} />恢复</button> : <><button className="home-archive-action home-hover-action" aria-label="归档任务" title={`归档到${formatArchiveMonth(getTaskArchiveMonth(row))}`} type="button" onClick={() => setArchived(row.id, true)}><Archive size={14} />归档</button><button aria-label="删除任务" type="button" onClick={() => applyTable({ ...table, rows: table.rows.filter((item) => item.id !== row.id) })}><Trash2 size={14} /></button></>}</div></td></tr>)}</tbody>
+        </table>
+      </div>
+    )
+  }
 
   if (!loginState?.isLoggedIn) {
     return (
@@ -259,32 +320,28 @@ export function HomePage(): React.JSX.Element {
 
   return (
     <div className="page home-page home-task-page">
-      <PageHeader eyebrow="DAILY WORK" title="每日任务" description={`当前账号：${loginState.account}`} actions={<div className={`home-save-state ${saveStatus}`}><span />{saveLabel}</div>} />
+      <PageHeader eyebrow="DAILY WORK" title={archiveView ? '归档任务' : '每日任务'} description={archiveView ? '按任务日期的月份归档；无有效日期时使用归档当月。展开月份查看，可随时恢复到首页。' : `当前账号：${loginState.account}`} actions={<div className={`home-save-state ${saveStatus}`}><span />{saveLabel}</div>} />
 
       {loginState.callbackStatus === 'running' ? <div className="home-message info">正在执行登录后的操作…</div> : null}
       {loginState.callbackStatus === 'failed' ? <div className="home-message error"><AlertCircle size={15} /><span>{loginState.callbackError}</span></div> : null}
-      {tableError ? <div className="home-message error"><AlertCircle size={15} /><span>{tableError}</span>{!table ? <button className="button compact" type="button" onClick={() => void loadTable()}>重试</button> : null}</div> : null}
+      {tableError ? <div className="home-message error"><AlertCircle size={15} /><span>{tableError}</span>{saveStatus === 'failed' && table ? <button className="button compact" type="button" onClick={() => applyTable(table, true)}>重试保存</button> : null}{!table ? <button className="button compact" type="button" onClick={() => void loadTable()}>重试</button> : null}</div> : null}
 
       <section className="home-task-toolbar">
-        <div className="home-search"><Search size={15} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索全部任务" /></div>
+        <div className="home-search"><Search size={15} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={archiveView ? '搜索归档任务' : '搜索当前任务'} /></div>
         {table?.columns.some((column) => column.id === 'date') ? <label className="home-filter"><CalendarDays size={15} /><input aria-label="按日期筛选" type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} /></label> : null}
         {statusColumn ? <select className="home-filter-select" aria-label="按状态筛选" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="">全部状态</option>{statusColumn.options?.map((option) => <option key={option}>{option}</option>)}</select> : null}
+        {archiveView ? <select className="home-filter-select" aria-label="按归档月份筛选" value={monthFilter} onChange={(event) => setMonthFilter(event.target.value)}><option value="">全部月份</option>{archiveMonths.map((month) => <option key={month} value={month}>{formatArchiveMonth(month)}</option>)}</select> : null}
         <div className="home-toolbar-spacer" />
-        <button className="button secondary" disabled={!table || table.columns.length >= 40} type="button" onClick={addColumn}><Columns3 size={15} />新增列</button>
-        <button className="button primary" disabled={!table} type="button" onClick={() => table && applyTable({ ...table, rows: [...table.rows, newRow(table.columns)] })}><Plus size={15} />新增任务</button>
+        <button className="button secondary" type="button" onClick={switchView}>{archiveView ? <ArrowLeft size={15} /> : <Archive size={15} />}{archiveView ? '返回首页' : `归档任务 (${archiveCount})`}</button>
+        {!archiveView ? <><button className="button secondary" disabled={!table || table.columns.length >= 40} type="button" onClick={addColumn}><Columns3 size={15} />新增列</button>
+        <button className="button primary" disabled={!table} type="button" onClick={() => table && applyTable({ ...table, rows: [...table.rows, newRow(table.columns)] })}><Plus size={15} />新增任务</button></> : null}
       </section>
 
       {table ? (
         <section className="home-table-card">
-          <div className="home-table-scroll">
-            <table className="home-task-table" style={{ width: table.columns.reduce((sum, column) => sum + columnWidth(column), 58) }}>
-              <colgroup>{table.columns.map((column) => <col key={column.id} style={{ width: columnWidth(column) }} />)}<col style={{ width: 58 }} /></colgroup>
-              <thead><tr>{table.columns.map((column) => <th key={column.id}><div className="home-column-head"><input aria-label={`列名：${column.label}`} maxLength={80} value={column.label} onChange={(event) => renameColumn(column.id, event.target.value)} /><button aria-label={`删除${column.label}列`} disabled={table.columns.length === 1} type="button" onClick={() => removeColumn(column)}><Trash2 size={13} /></button></div><span className="home-column-resize" role="separator" aria-label={`调整${column.label}列宽`} onPointerDown={(event) => beginColumnResize(event, column)} /></th>)}<th className="home-row-actions-head">操作</th></tr></thead>
-              <tbody>{visibleRows.map((row) => <tr key={row.id} className={row.cells.status === '完成' ? 'home-task-row-completed' : undefined}>{table.columns.map((column) => <td key={column.id}><TaskCell column={column} value={row.cells[column.id] ?? ''} onChange={(value) => updateCell(row.id, column.id, value)} /></td>)}<td className="home-row-actions"><button aria-label="删除任务" type="button" onClick={() => applyTable({ ...table, rows: table.rows.filter((item) => item.id !== row.id) })}><Trash2 size={14} /></button></td></tr>)}</tbody>
-            </table>
-          </div>
-          {visibleRows.length === 0 ? <div className="home-table-empty"><ListTodo size={25} /><strong>{table.rows.length ? '没有符合筛选条件的任务' : '还没有任务'}</strong><span>{table.rows.length ? '调整筛选条件后再试。' : '点击“新增任务”开始记录今天的工作。'}</span></div> : null}
-          <footer><span>共 {table.rows.length} 条任务</span>{visibleRows.length !== table.rows.length ? <span>当前显示 {visibleRows.length} 条</span> : null}</footer>
+          {archiveView ? archiveGroups.map(([month, rows]) => <details className="home-archive-group" key={month} open={Boolean(monthFilter || search.trim() || dateFilter || statusFilter) || undefined}><summary><Archive size={16} /><strong>{formatArchiveMonth(month)}</strong><span>{rows.length} 条任务</span></summary>{renderTable(rows)}</details>) : renderTable(visibleRows)}
+          {visibleRows.length === 0 ? <div className="home-table-empty"><ListTodo size={25} /><strong>{(archiveView ? archiveCount : activeCount) ? '没有符合筛选条件的任务' : archiveView ? '还没有归档任务' : '当前没有任务'}</strong><span>{(archiveView ? archiveCount : activeCount) ? '调整筛选条件后再试。' : archiveView ? '在首页将鼠标移到任务行，点击“归档”即可收纳。' : '点击“新增任务”继续记录，历史任务可在“归档任务”中查看。'}</span></div> : null}
+          <footer><span>{archiveView ? `已归档 ${archiveCount}` : `当前 ${activeCount}`} 条任务</span>{visibleRows.length !== (archiveView ? archiveCount : activeCount) ? <span>筛选结果 {visibleRows.length} 条</span> : null}</footer>
         </section>
       ) : tableError ? null : <section className="home-table-loading">正在读取任务记录…</section>}
     </div>

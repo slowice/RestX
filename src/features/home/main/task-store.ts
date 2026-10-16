@@ -57,6 +57,9 @@ function assertRow(value: unknown, columnIds: ReadonlySet<string>): asserts valu
   if (typeof row.id !== 'string' || !VALID_ID.test(row.id)) throw new HomeError('INVALID_INPUT', '任务行标识无效。')
   if (typeof row.createdAt !== 'string' || !Number.isFinite(Date.parse(row.createdAt))) throw new HomeError('INVALID_INPUT', '任务创建时间无效。')
   if (typeof row.updatedAt !== 'string' || !Number.isFinite(Date.parse(row.updatedAt))) throw new HomeError('INVALID_INPUT', '任务更新时间无效。')
+  if (row.archiveMonth !== undefined && (typeof row.archiveMonth !== 'string' || !/^\d{4}-(0[1-9]|1[0-2])$/.test(row.archiveMonth))) {
+    throw new HomeError('INVALID_INPUT', '任务归档月份无效。')
+  }
   if (!row.cells || typeof row.cells !== 'object' || Array.isArray(row.cells)) throw new HomeError('INVALID_INPUT', '任务单元格格式无效。')
   for (const [columnId, content] of Object.entries(row.cells as Record<string, unknown>)) {
     if (!columnIds.has(columnId) || typeof content !== 'string' || content.length > MAX_CELL_LENGTH) throw new HomeError('INVALID_INPUT', '任务单元格内容无效。')
