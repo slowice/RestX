@@ -6,13 +6,14 @@ export type MailLaunchErrorCode = 'UNSUPPORTED_PLATFORM' | 'OUTLOOK_NOT_FOUND' |
 
 export type MailLaunchLogEvent = {
   timestamp: string
-  stage: 'discovery' | 'prepare' | 'launch'
+  stage: 'discovery' | 'prepare' | 'launch' | 'import'
   outcome: 'success' | 'skipped' | 'failure'
   code?: MailLaunchErrorCode
   source?: string
   outlookPath?: string
   error?: { name: string; code?: string }
   marker?: string
+  importDetails?: Record<string, string | boolean | number>
   tableStyles?: { implementation: string; tables: number; cells: number; cellsWithBorder: number }
 }
 

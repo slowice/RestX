@@ -5,6 +5,8 @@ import { MAIL_TEMPLATE_LIMITS, type ImportedMailMessage } from '../shared/contra
 import { isValidEmailAddress } from '../shared/template-engine'
 import { mailHtmlToText } from '../shared/rich-body'
 import { importRichBody, type InlineMailImage } from './import-rich-body'
+import { readMsgHtmlWithOutlook } from './msg-outlook-html'
+import { formatMailLaunchTimestamp, mailLaunchLogger } from './mail-launch-logger'
 
 type FileStat = { size: number; isFile(): boolean }
 type MsgReaderConstructor = new (arrayBuffer: ArrayBuffer | DataView) => { getFileData(): FieldsData; getAttachment(attachment: FieldsData): { content: Uint8Array } }
@@ -32,7 +34,7 @@ export async function parseOutlookMessage(buffer: Buffer, format: 'eml' | 'msg',
   try {
     return format === 'eml'
       ? await parseEmlMessage(buffer, sourceName)
-      : parseMsgMessage(buffer, sourceName)
+      : await parseMsgMessage(buffer, sourceName)
   } catch (reason) {
     if (reason instanceof Error && /^导入/.test(reason.message)) throw reason
     throw new Error(`导入失败：无法解析该 ${format.toUpperCase()} 文件，请确认它是由 Outlook 导出的完整邮件。`)
@@ -60,12 +62,31 @@ async function parseEmlMessage(buffer: Buffer, sourceName: string): Promise<Impo
   })
 }
 
-function parseMsgMessage(buffer: Buffer, sourceName: string): ImportedMailMessage {
+async function parseMsgMessage(buffer: Buffer, sourceName: string): Promise<ImportedMailMessage> {
   const arrayBuffer = Uint8Array.from(buffer).buffer
   const MessageReader = resolveMsgReaderConstructor(MsgReader)
   const reader = new MessageReader(arrayBuffer)
   const fields = reader.getFileData()
   if (fields.error) throw new Error('导入失败：MSG 文件内容无效。')
+  const originalHtml = readMsgHtml(fields)
+  const hasRtf = Boolean(fields.compressedRtf?.length)
+  await recordMsgImport('[mail-template-import][R01-01]', {
+    implementation: 'msg-rich-body-v2', hasHtml: Boolean(originalHtml.trim()), hasRtf,
+    sourceTables: (originalHtml.match(/<table\b/gi) ?? []).length
+  })
+  let html = originalHtml
+  if (!html.trim() && hasRtf) {
+    try {
+      html = await readMsgHtmlWithOutlook(buffer)
+    } catch (reason) {
+      await recordMsgImport('[mail-template-import][R01-02]', { source: 'outlook-rtf', recovered: false })
+      throw reason
+    }
+  }
+  await recordMsgImport('[mail-template-import][R01-02]', {
+    source: originalHtml.trim() ? 'msg-html' : hasRtf ? 'outlook-rtf' : 'plain-text',
+    recovered: Boolean(html.trim()), sourceTables: (html.match(/<table\b/gi) ?? []).length
+  })
   const images: InlineMailImage[] = []
   for (const attachment of fields.attachments ?? []) {
     if (!attachment.pidContentId) continue
@@ -74,7 +95,19 @@ function parseMsgMessage(buffer: Buffer, sourceName: string): ImportedMailMessag
         contentType: attachment.attachMimeTag ?? imageMimeType(attachment.fileName ?? '') })
     } catch { /* Missing image data is reported when resolving the HTML reference. */ }
   }
-  return normalizeMsgFields(fields, sourceName, images)
+  const result = normalizeMsgFields({ ...fields, bodyHtml: html }, sourceName, images)
+  await recordMsgImport('[mail-template-import][R01-03]', {
+    outputTables: (result.bodyHtml?.match(/<table\b/gi) ?? []).length,
+    outputRows: (result.bodyHtml?.match(/<tr\b/gi) ?? []).length,
+    outputCells: (result.bodyHtml?.match(/<t[dh]\b/gi) ?? []).length
+  })
+  return result
+}
+
+// Temporary metadata-only diagnostics; remove at explicit pre-submit review.
+async function recordMsgImport(marker: string, details: Record<string, string | boolean | number>): Promise<void> {
+  await mailLaunchLogger.write({ timestamp: formatMailLaunchTimestamp(), stage: 'import',
+    outcome: details.source === 'outlook-rtf' && details.recovered === false ? 'failure' : 'success', marker, importDetails: details }).catch(() => undefined)
 }
 
 export function resolveMsgReaderConstructor(value: unknown): MsgReaderConstructor {
@@ -87,9 +120,10 @@ export function resolveMsgReaderConstructor(value: unknown): MsgReaderConstructo
 
 export function normalizeMsgFields(fields: FieldsData, sourceName: string, images: InlineMailImage[] = []): ImportedMailMessage {
   const recipients = fields.recipients ?? []
-  const html = fields.bodyHtml ?? decodeMsgHtml(fields)
+  const html = readMsgHtml(fields)
   const warnings: string[] = []
   const bodyHtml = html ? importRichBody(html, images, warnings) : undefined
+  if (!html.trim()) warnings.push('这封 MSG 没有可用的 HTML 正文，当前按纯文本导入；表格结构无法从纯文本恢复。')
   const body = cleanText(fields.body || (html ? htmlToPlainText(html) : ''))
   return finalizeImportedMessage({
     sourceName,
@@ -133,6 +167,11 @@ function readFormat(filePath: string): 'eml' | 'msg' {
 function imageMimeType(fileName: string): string {
   const extension = path.extname(fileName).toLowerCase()
   return ({ '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' } as Record<string, string>)[extension] ?? ''
+}
+
+function readMsgHtml(fields: FieldsData): string {
+  const textHtml = fields.bodyHtml?.replace(/\u0000/g, '') ?? ''
+  return textHtml.trim() ? textHtml : decodeMsgHtml(fields).replace(/\u0000/g, '')
 }
 
 function decodeMsgHtml(fields: FieldsData): string {
