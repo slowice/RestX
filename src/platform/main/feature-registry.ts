@@ -1,3 +1,4 @@
+import { defectManagerMainFeature } from '../../features/defect-manager/main/register'
 import { aiInspectorMainFeature } from '../../features/ai-inspector/main/register'
 import { codeReviewMainFeature } from '../../features/code-review/main/register'
 import { mailTemplateMainFeature } from '../../features/mail-template/main/register'
@@ -8,7 +9,7 @@ import { validateFeatureDefinitions, validateUniqueChannels } from '../shared/fe
 import type { MainFeature } from './define-feature'
 import type { IpcHandlerRegistry } from './ipc'
 
-const registeredFeatures = [homeMainFeature, aiInspectorMainFeature, codeReviewMainFeature, knowledgeMapMainFeature, mailTemplateMainFeature, frequentSkillsMainFeature] satisfies readonly MainFeature[]
+const registeredFeatures = [defectManagerMainFeature, homeMainFeature, aiInspectorMainFeature, codeReviewMainFeature, knowledgeMapMainFeature, mailTemplateMainFeature, frequentSkillsMainFeature] satisfies readonly MainFeature[]
 
 export const mainFeatures = validateFeatureDefinitions(registeredFeatures)
 

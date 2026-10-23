@@ -1,3 +1,4 @@
+import { defectManagerFeature } from '../../features/defect-manager/renderer/feature'
 import { aiInspectorFeature } from '../../features/ai-inspector/renderer/feature'
 import { codeReviewFeature } from '../../features/code-review/renderer/feature'
 import { homeFeature } from '../../features/home/renderer/feature'
@@ -9,7 +10,7 @@ import { frequentSkillsFeature } from '../../features/frequent-skills/renderer/f
 import { validateFeatureDefinitions } from '../shared/feature-validation'
 import type { RendererFeature } from './define-feature'
 
-const registeredFeatures = [homeFeature, aiInspectorFeature, knowledgeMapFeature, frequentSkillsFeature, codeReviewFeature, mailTemplateFeature, labFeature, settingsFeature] satisfies readonly RendererFeature[]
+const registeredFeatures = [defectManagerFeature, homeFeature, aiInspectorFeature, knowledgeMapFeature, frequentSkillsFeature, codeReviewFeature, mailTemplateFeature, labFeature, settingsFeature] satisfies readonly RendererFeature[]
 
 export type RendererFeatureRegistry = {
   features: RendererFeature[]
